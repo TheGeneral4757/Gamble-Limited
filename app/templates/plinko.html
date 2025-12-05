@@ -7,14 +7,12 @@
         <a href="/" class="back-link">← Back to Lobby</a>
     </div>
 
-    <div class="game-area">
-        <div class="plinko-board" id="plinko-board">
-            <!-- Pegs will be generated dynamically -->
-            <div class="ball" id="plinko-ball" style="display: none;">⚪</div>
-        </div>
-
-        <div class="multiplier-slots" id="multiplier-slots">
-            <!-- Multipliers shown at bottom -->
+    <div class="game-area plinko-area">
+        <div class="plinko-wrapper">
+            <div class="plinko-board" id="plinko-board">
+                <div class="ball" id="plinko-ball">⚪</div>
+            </div>
+            <div class="multiplier-row" id="multiplier-slots"></div>
         </div>
 
         <div id="plinko-result" class="plinko-result"></div>
@@ -32,7 +30,7 @@
 
         <div class="rows-selector">
             <label>Rows:</label>
-            <select id="rows-select" onchange="initBoard(parseInt(this.value)); playSound('click');">
+            <select id="rows-select" onchange="initBoard(); playSound('click');">
                 <option value="8">8 Rows</option>
                 <option value="12">12 Rows</option>
                 <option value="16" selected>16 Rows</option>
@@ -46,7 +44,6 @@
 
 {% block scripts %}
 <script>
-    // Rebalanced multipliers - max 16x, mostly losses in center
     const MULTIPLIERS = {
         16: [16, 9, 2, 1.4, 1.1, 0.5, 0.3, 0.5, 0.3, 0.5, 0.3, 0.5, 1.1, 1.4, 2, 9, 16],
         12: [10, 3, 1.5, 0.6, 0.4, 0.3, 0.3, 0.4, 0.6, 1.5, 3, 10],
@@ -61,20 +58,22 @@
     input.value = newValue;
 }
 
-    function initBoard(rows) {
+    function initBoard() {
+        const rows = parseInt(document.getElementById('rows-select').value);
         const board = document.getElementById('plinko-board');
         const slotsContainer = document.getElementById('multiplier-slots');
-        const multipliers = MULTIPLIERS[rows] || MULTIPLIERS[16];
+        const multipliers = MULTIPLIERS[rows];
 
-        // Generate pegs
-        board.innerHTML = '<div class="ball" id="plinko-ball" style="display: none;">⚪</div>';
+        // Clear and recreate board
+        board.innerHTML = '<div class="ball" id="plinko-ball">⚪</div>';
 
+        // Create peg rows
         for (let row = 0; row < rows; row++) {
             const pegRow = document.createElement('div');
             pegRow.className = 'peg-row';
-            pegRow.style.setProperty('--row', row);
 
-            for (let peg = 0; peg <= row; peg++) {
+            const pegsInRow = row + 3; // Start with 3 pegs, add 1 each row
+            for (let peg = 0; peg < pegsInRow; peg++) {
                 const pegEl = document.createElement('div');
                 pegEl.className = 'peg';
                 pegRow.appendChild(pegEl);
@@ -82,13 +81,18 @@
             board.appendChild(pegRow);
         }
 
-        // Generate multiplier slots with proper coloring
-        slotsContainer.innerHTML = multipliers.map((mult, i) => {
-            let colorClass = 'low';  // Red - loss
-            if (mult >= 2) colorClass = 'high';  // Green - profit
-            else if (mult >= 1) colorClass = 'medium';  // Yellow - break even ish
-            return `<div class="mult-slot ${colorClass}" data-index="${i}">${mult}x</div>`;
-        }).join('');
+        // Create multiplier slots
+        slotsContainer.innerHTML = '';
+        multipliers.forEach((mult, i) => {
+            const slot = document.createElement('div');
+            let colorClass = 'low';
+            if (mult >= 2) colorClass = 'high';
+            else if (mult >= 1) colorClass = 'medium';
+            slot.className = `mult-slot ${colorClass}`;
+            slot.textContent = mult + 'x';
+            slot.dataset.index = i;
+            slotsContainer.appendChild(slot);
+        });
     }
 
     async function dropBall() {
@@ -99,6 +103,7 @@
         const dropBtn = document.getElementById('drop-btn');
         const resultEl = document.getElementById('plinko-result');
         const ball = document.getElementById('plinko-ball');
+        const board = document.getElementById('plinko-board');
 
         isDropping = true;
         dropBtn.disabled = true;
@@ -121,27 +126,35 @@
 
             // Animate ball dropping
             ball.style.display = 'block';
-            ball.style.left = '50%';
-            ball.style.top = '0';
+            ball.style.opacity = '1';
 
-            let position = 0;
+            const boardRect = board.getBoundingClientRect();
+            const boardWidth = boardRect.width;
+            const boardHeight = boardRect.height;
+
+            let posX = boardWidth / 2;
+            ball.style.left = posX + 'px';
+            ball.style.top = '10px';
+
+            // Animate through path
             for (let i = 0; i < data.path.length; i++) {
-                await new Promise(r => setTimeout(r, 80));
-                position += data.path[i] === 'L' ? -1 : 1;
+                await new Promise(r => setTimeout(r, 60));
 
-                const progress = (i + 1) / data.path.length;
-                const leftPercent = 50 + (position * 3);
-                ball.style.left = leftPercent + '%';
-                ball.style.top = (progress * 85) + '%';
+                const direction = data.path[i] === 'L' ? -1 : 1;
+                posX += direction * (boardWidth / (rows * 2.5));
 
-                // Play bounce sound
-                playSound('ballDrop');
+                const yProgress = ((i + 1) / data.path.length) * (boardHeight - 40);
+
+                ball.style.left = Math.max(20, Math.min(boardWidth - 20, posX)) + 'px';
+                ball.style.top = (10 + yProgress) + 'px';
+
+                if (i % 2 === 0) playSound('ballDrop');
             }
 
-            // Highlight winning slot
             await new Promise(r => setTimeout(r, 200));
             playSound('ballLand');
 
+            // Highlight winning slot
             const slots = document.querySelectorAll('.mult-slot');
             if (slots[data.final_slot]) {
                 slots[data.final_slot].classList.add('winner');
@@ -149,30 +162,34 @@
 
             // Show result
             if (data.big_win) {
-                resultEl.textContent = `🎉 ${data.multiplier}x - BIG WIN! +${data.payout} CR`;
+                resultEl.textContent = `🎉 ${data.multiplier}x - BIG WIN! +${data.payout.toFixed(2)} CR`;
                 resultEl.classList.add('win');
                 playSound('bigWin');
             } else if (data.win) {
-                resultEl.textContent = `✅ ${data.multiplier}x - You win! +${data.payout} CR`;
+                resultEl.textContent = `✅ ${data.multiplier}x - You win! +${data.payout.toFixed(2)} CR`;
                 resultEl.classList.add('win');
                 playSound('win');
             } else {
-                resultEl.textContent = `${data.multiplier}x - ${data.payout} CR returned (${data.net} net)`;
+                resultEl.textContent = `${data.multiplier}x - Returned ${data.payout.toFixed(2)} CR (${data.net.toFixed(2)} net)`;
                 resultEl.classList.add('partial');
                 playSound('lose');
             }
 
             updateBalance(data.balance);
 
-            // Reset after delay
+            // Reset
             await new Promise(r => setTimeout(r, 1500));
-            ball.style.display = 'none';
+            ball.style.opacity = '0';
             slots.forEach(s => s.classList.remove('winner'));
+
+            setTimeout(() => {
+                ball.style.left = '50%';
+                ball.style.top = '10px';
+            }, 300);
 
         } catch (error) {
             resultEl.textContent = '❌ ' + error.message;
             resultEl.classList.add('error');
-            ball.style.display = 'none';
             playSound('error');
         }
 
@@ -182,6 +199,6 @@
     }
 
     // Initialize on load
-    initBoard(16);
+    initBoard();
 </script>
 {% endblock %}

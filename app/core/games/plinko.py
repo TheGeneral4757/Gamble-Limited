@@ -10,18 +10,17 @@ class PlinkoGame:
     Odds are weighted to favor lower multipliers (60-65% of drops result in loss).
     """
     
-    # Multipliers rebalanced - center slots are more likely due to probability
-    # Edge slots are rare but not absurdly high
-    # Values designed for ~5-8% house edge
+    # Multipliers HEAVILY nerfed - house edge ~15-20%
+    # Most common outcomes are 0.1x-0.3x (big losses)
+    # Edge slots are rare and only 3-5x max
     MULTIPLIERS = {
-        16: [16, 9, 2, 1.4, 1.1, 0.5, 0.3, 0.5, 0.3, 0.5, 0.3, 0.5, 1.1, 1.4, 2, 9, 16],
-        12: [10, 3, 1.5, 0.6, 0.4, 0.3, 0.3, 0.4, 0.6, 1.5, 3, 10, 0],
-        8:  [5.6, 2.1, 0.5, 0.2, 0.2, 0.5, 2.1, 5.6, 0],
+        16: [5, 2, 1, 0.5, 0.3, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.3, 0.5, 1, 2, 5],
+        12: [3, 1.5, 0.5, 0.2, 0.1, 0.1, 0.1, 0.1, 0.2, 0.5, 1.5, 3, 0],
+        8:  [2, 0.5, 0.2, 0.1, 0.1, 0.2, 0.5, 2, 0],
     }
     
-    # Bias factor - slight bias towards center (lower multipliers)
-    # 0.5 = fair, < 0.5 = bias left, > 0.5 = bias right towards center
-    CENTER_BIAS = 0.48  # Slightly bias towards center for house edge
+    # Stronger bias towards center (where multipliers are lowest)
+    CENTER_BIAS = 0.45  # Strong bias towards center for house edge
     
     def drop(self, bet_amount: float, rows: int = 16, risk: str = "medium") -> Dict:
         """

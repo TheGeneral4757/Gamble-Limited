@@ -21,11 +21,19 @@
             <nav>
                 <a href="/" class="nav-link">Home</a>
                 <a href="/exchange" class="nav-link">Exchange</a>
-                <a href="/admin" class="nav-link">Admin</a>
+                {% if user and user.is_admin %}
+                <a href="/admin" class="nav-link admin-link">Admin</a>
+                {% endif %}
             </nav>
-            <div class="user-stats">
-                <span class="currency cash">$<span id="cash-balance">---</span></span>
-                <span class="currency credits">CR <span id="credits-balance">---</span></span>
+            <div class="user-info">
+                {% if user %}
+                <span class="username">👤 {{ user.username }}</span>
+                <span class="currency cash">$<span id="cash-balance">{% if user.is_admin %}∞{% else %}---{% endif
+                        %}</span></span>
+                <span class="currency credits">CR <span id="credits-balance">{% if user.is_admin %}∞{% else %}---{%
+                        endif %}</span></span>
+                <a href="/logout" class="logout-link">Logout</a>
+                {% endif %}
             </div>
         </header>
 

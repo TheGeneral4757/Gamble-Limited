@@ -1,113 +1,174 @@
-from fastapi import APIRouter, Depends, HTTPException
-from app.core.security import require_admin_api
-from app.core.database import db
-from app.core.economy import economy
-from app.config import settings
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Request
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from typing import Optional
+from app.core.database import db
+from app.config import settings
+from app.routers.auth import require_admin
 
 router = APIRouter()
+templates = Jinja2Templates(directory="app/templates")
 
-# ==================== Request Models ====================
+# Request models
+class UserActionRequest(BaseModel):
+    user_id: int
+
+class PasswordChangeRequest(BaseModel):
+    new_password: str
 
 class GrantFundsRequest(BaseModel):
-    user_id: str
-    cash: float = 0
-    credits: float = 0
+    user_id: int
+    cash: Optional[float] = 0
+    credits: Optional[float] = 0
 
-class ResetUserRequest(BaseModel):
-    user_id: str
+class SetBalanceRequest(BaseModel):
+    user_id: int
+    cash: float
+    credits: float
 
-# ==================== Admin Endpoints ====================
-
-@router.get("/status")
-async def admin_status(username: str = Depends(require_admin_api)):
-    """Get admin panel status and basic stats."""
-    stats = db.get_stats()
-    return {
-        "status": "active",
-        "admin": username,
-        "app_name": settings.server.name,
-        "stats": stats
-    }
-
-@router.get("/users")
-async def list_users(username: str = Depends(require_admin_api)):
-    """List all users and their balances."""
+@router.get("")
+async def admin_panel(request: Request):
+    """Admin dashboard."""
+    user = require_admin(request)
+    if not user:
+        return RedirectResponse(url="/auth", status_code=303)
+    
     users = db.get_all_users()
-    return {"users": users, "count": len(users)}
-
-@router.get("/users/{user_id}")
-async def get_user_details(user_id: str, username: str = Depends(require_admin_api)):
-    """Get detailed info for a specific user."""
-    balance = db.get_balance(user_id)
-    transactions = db.get_transactions(user_id, limit=50)
-    return {
-        "user_id": user_id,
-        "balance": balance,
-        "transactions": transactions
-    }
-
-@router.post("/users/grant")
-async def grant_funds(data: GrantFundsRequest, username: str = Depends(require_admin_api)):
-    """Grant funds to a user."""
-    new_balance = economy.grant_funds(data.user_id, data.cash, data.credits)
-    return {
-        "success": True,
-        "user_id": data.user_id,
-        "granted": {"cash": data.cash, "credits": data.credits},
-        "new_balance": new_balance
-    }
-
-@router.post("/users/reset")
-async def reset_user(data: ResetUserRequest, username: str = Depends(require_admin_api)):
-    """Reset a user's balance to starting values."""
-    new_balance = economy.reset_user(data.user_id)
-    return {
-        "success": True,
-        "user_id": data.user_id,
-        "new_balance": new_balance
-    }
-
-@router.post("/economy/clear")
-async def clear_all_data(username: str = Depends(require_admin_api)):
-    """Clear ALL user data from the database. Use with caution!"""
-    result = db.clear_all_data()
-    return {
-        "success": True,
-        "action": "database_cleared",
-        "admin": username,
-        **result
-    }
-
-@router.get("/stats")
-async def get_stats(username: str = Depends(require_admin_api)):
-    """Get detailed statistics."""
     stats = db.get_stats()
-    exchange_rate = economy.get_current_exchange_rate()
+    game_stats = db.get_game_breakdown()
+    leaderboard = db.get_leaderboard()
+    
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "app_name": settings.server.name,
+        "user": user,
+        "users": users,
+        "stats": stats,
+        "game_stats": game_stats,
+        "leaderboard": leaderboard
+    })
+
+@router.post("/api/reset-user")
+async def reset_user(request: Request, data: UserActionRequest):
+    """Reset a user to default balance."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    result = db.reset_user(data.user_id)
+    return result
+
+@router.post("/api/delete-user")
+async def delete_user(request: Request, data: UserActionRequest):
+    """Delete a user completely."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    result = db.delete_user(data.user_id)
+    return result
+
+@router.post("/api/grant-funds")
+async def grant_funds(request: Request, data: GrantFundsRequest):
+    """Grant cash/credits to a user."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    new_balance = db.update_balance(data.user_id, cash_delta=data.cash, credits_delta=data.credits)
+    return {"success": True, "balance": new_balance}
+
+@router.post("/api/set-balance")
+async def set_balance(request: Request, data: SetBalanceRequest):
+    """Set exact balance for a user."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    new_balance = db.set_balance(data.user_id, cash=data.cash, credits=data.credits)
+    return {"success": True, "balance": new_balance}
+
+@router.post("/api/clear-all")
+async def clear_all_data(request: Request):
+    """Clear all user data."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    result = db.clear_all_data()
+    return result
+
+@router.post("/api/change-password")
+async def change_password(request: Request, data: PasswordChangeRequest):
+    """Change admin password."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    if len(data.new_password) < 4:
+        return {"success": False, "error": "Password too short"}
+    
+    db.set_admin_password(data.new_password)
+    return {"success": True, "message": "Password updated. Server restart may be required."}
+
+@router.get("/api/users")
+async def get_users(request: Request):
+    """Get all users list."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    users = db.get_all_users()
+    return {"users": users}
+
+@router.get("/api/user/{user_id}")
+async def get_user_details(request: Request, user_id: int):
+    """Get detailed user info."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    user_data = db.get_user_by_id(user_id)
+    if not user_data:
+        return {"success": False, "error": "User not found"}
+    
+    transactions = db.get_transactions(user_id, limit=20)
+    game_stats = db.get_user_game_stats(user_id)
     
     return {
-        "stats": stats,
-        "exchange_rate": exchange_rate,
-        "game_config": settings.games.model_dump()
+        "success": True,
+        "user": user_data,
+        "transactions": transactions,
+        "game_stats": game_stats
     }
 
-@router.get("/transactions")
-async def list_all_transactions(
-    limit: int = 100,
-    username: str = Depends(require_admin_api)
-):
-    """List recent transactions across all users."""
-    conn = db._get_connection()
-    cursor = conn.cursor()
+@router.get("/api/stats")
+async def get_stats(request: Request):
+    """Get platform statistics."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
     
-    cursor.execute("""
-        SELECT t.*, u.cash, u.credits 
-        FROM transactions t
-        LEFT JOIN users u ON t.user_id = u.id
-        ORDER BY t.created_at DESC 
-        LIMIT ?
-    """, (limit,))
+    stats = db.get_stats()
+    return stats
+
+@router.get("/api/leaderboard")
+async def get_leaderboard(request: Request):
+    """Get top players."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
     
-    transactions = [dict(row) for row in cursor.fetchall()]
-    return {"transactions": transactions, "count": len(transactions)}
+    leaderboard = db.get_leaderboard()
+    return {"leaderboard": leaderboard}
+
+@router.get("/api/game-stats")
+async def get_game_stats(request: Request):
+    """Get per-game statistics."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    stats = db.get_game_breakdown()
+    return {"game_stats": stats}

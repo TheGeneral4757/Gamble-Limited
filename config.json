@@ -7,7 +7,7 @@
     },
     "security": {
         "admin_username": "admin",
-        "admin_password_hash": "$2b$12$v.4ehgJvT8yRvQhwsbmGgeOkm0s/fndPTQ.0WQot7IogL9gpDNsgG",
+        "admin_password_hash": "$2b$12$sbAYQJ8zIrBNeEqpCyWR2OowiV0RXH.qmfq5k9xeYzE4X8O26tOV6",
         "secret_key": "CHANGE_THIS_IN_PRODUCTION_PLEASE"
     },
     "economy": {

@@ -1,26 +1,85 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="game-container" style="max-width: 400px; margin-top: 50px;">
-    <div class="game-header" style="justify-content: center;">
-        <h2>Admin Login</h2>
-    </div>
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>🎰 {{ app_name }}</h2>
+            <p>Welcome to the casino!</p>
+        </div>
 
-    <div class="game-area" style="height: auto; padding: 40px; display: block;">
-        <form action="/login" method="post" style="display: flex; flex-direction: column; gap: 20px;">
-            <div class="bet-controls" style="width: 100%;">
-                <label style="display: block; margin-bottom: 5px;">Username</label>
-                <input type="text" name="username" required style="width: 100%; padding: 12px;">
-            </div>
-            <div class="bet-controls" style="width: 100%;">
-                <label style="display: block; margin-bottom: 5px;">Password</label>
-                <input type="password" name="password" required style="width: 100%; padding: 12px;">
-            </div>
-            {% if error %}
-            <div style="color: #ff5555; text-align: center;">{{ error }}</div>
+        <div class="auth-tabs">
+            <button class="auth-tab active" onclick="showTab('login')">Login</button>
+            <button class="auth-tab" onclick="showTab('register')">New Player</button>
+            <button class="auth-tab admin-tab" onclick="showTab('admin')">🔐 Admin</button>
+        </div>
+
+        <!-- Login Tab -->
+        <div id="login-tab" class="auth-form active">
+            <form action="/auth/login" method="POST">
+                <div class="form-group">
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" name="username" required placeholder="Enter your username"
+                        autocomplete="username">
+                </div>
+                <button type="submit" class="auth-btn">🎮 Enter Casino</button>
+            </form>
+            {% if error and not is_admin %}
+            <div class="auth-error">{{ error }}</div>
             {% endif %}
-            <button type="submit" class="action-btn" style="width: 100%; margin-top: 10px;">Login</button>
-        </form>
+        </div>
+
+        <!-- Register Tab -->
+        <div id="register-tab" class="auth-form">
+            <form action="/auth/register" method="POST">
+                <div class="form-group">
+                    <label for="reg-username">Choose Username</label>
+                    <input type="text" id="reg-username" name="username" required placeholder="Pick a unique username"
+                        minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+"
+                        title="Letters, numbers, and underscores only">
+                </div>
+                <p class="form-hint">You'll start with $1000 cash and 500 credits!</p>
+                <button type="submit" class="auth-btn register">🎉 Create Account</button>
+            </form>
+            {% if reg_error %}
+            <div class="auth-error">{{ reg_error }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Admin Tab -->
+        <div id="admin-tab" class="auth-form">
+            <form action="/auth/admin-login" method="POST">
+                <div class="form-group">
+                    <label for="admin-password">Admin Password</label>
+                    <input type="password" id="admin-password" name="password" required
+                        placeholder="Enter admin password">
+                </div>
+                <button type="submit" class="auth-btn admin">🔐 Admin Login</button>
+            </form>
+            {% if is_admin and error %}
+            <div class="auth-error">{{ error }}</div>
+            {% endif %}
+            <p class="admin-hint">Admin accounts have unlimited funds</p>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showTab(tab) {
+        // Hide all tabs
+        document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+
+        // Show selected
+        document.getElementById(tab + '-tab').classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    // Check URL for registration success
+    if (window.location.search.includes('registered=1')) {
+        showTab('login');
+    }
+</script>
 {% endblock %}
