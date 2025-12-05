@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container coinflip-game">
+    <div class="game-header">
+        <h2>🪙 Coinflip</h2>
+        <a href="/" class="back-link">← Back to Lobby</a>
+    </div>
+
+    <div class="game-area">
+        <div class="coin-container">
+            <div class="coin" id="coin">
+                <div class="coin-face heads">👑</div>
+                <div class="coin-face tails">🦅</div>
+            </div>
+        </div>
+
+        <div id="flip-result" class="flip-result"></div>
+    </div>
+
+    <div class="choice-selector">
+        <button class="choice-btn active" id="heads-btn" onclick="selectChoice('heads')">
+            <span class="choice-icon">👑</span>
+            <span class="choice-label">HEADS</span>
+        </button>
+        <span class="vs-text">VS</span>
+        <button class="choice-btn" id="tails-btn" onclick="selectChoice('tails')">
+            <span class="choice-icon">🦅</span>
+            <span class="choice-label">TAILS</span>
+        </button>
+    </div>
+
+    <div class="game-controls">
+        <div class="bet-controls">
+            <label>Bet Amount</label>
+            <div class="bet-input-group">
+                <button class="bet-adjust" onclick="adjustBet(-10); playSound('click');">-</button>
+                <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                <button class="bet-adjust" onclick="adjustBet(10); playSound('click');">+</button>
+            </div>
+            <span class="payout-info">Win: 1.95x your bet</span>
+        </div>
+        <button class="action-btn flip-btn" id="flip-btn" onclick="flipCoin()">🪙 FLIP</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentChoice = 'heads';
+    let isFlipping = false;
+
+    function adjustBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const newValue = Math.max({{ min_bet }}, Math.min({{ max_bet }}, parseInt(input.value || 0) + amount));
+    input.value = newValue;
+}
+
+    function selectChoice(choice) {
+        currentChoice = choice;
+        document.getElementById('heads-btn').classList.toggle('active', choice === 'heads');
+        document.getElementById('tails-btn').classList.toggle('active', choice === 'tails');
+        playSound('click');
+    }
+
+    async function flipCoin() {
+        if (isFlipping) return;
+
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        const flipBtn = document.getElementById('flip-btn');
+        const coin = document.getElementById('coin');
+        const resultEl = document.getElementById('flip-result');
+
+        isFlipping = true;
+        flipBtn.disabled = true;
+        flipBtn.textContent = '🪙 FLIPPING...';
+        resultEl.textContent = '';
+        resultEl.className = 'flip-result';
+
+        // Start flip animation and sound
+        coin.classList.remove('heads', 'tails', 'winner');
+        coin.classList.add('flipping');
+        playSound('coinFlip');
+
+        try {
+            const response = await fetch('/api/games/coinflip/flip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bet, choice: currentChoice })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Flip failed');
+            }
+
+            // Wait for animation
+            await new Promise(r => setTimeout(r, 2000));
+
+            // Stop on result
+            coin.classList.remove('flipping');
+            coin.classList.add(data.result);
+
+            // Show result
+            await new Promise(r => setTimeout(r, 300));
+
+            const resultIcon = data.result === 'heads' ? '👑' : '🦅';
+
+            if (data.win) {
+                resultEl.innerHTML = `${resultIcon} <strong>${data.result.toUpperCase()}</strong> - YOU WIN! +${data.payout} CR`;
+                resultEl.classList.add('win');
+                coin.classList.add('winner');
+                playSound('win');
+            } else {
+                resultEl.innerHTML = `${resultIcon} <strong>${data.result.toUpperCase()}</strong> - Better luck next time!`;
+                resultEl.classList.add('lose');
+                playSound('lose');
+            }
+
+            updateBalance(data.balance);
+
+            // Reset coin
+            await new Promise(r => setTimeout(r, 1500));
+            coin.classList.remove('heads', 'tails', 'winner');
+
+        } catch (error) {
+            coin.classList.remove('flipping');
+            resultEl.textContent = '❌ ' + error.message;
+            resultEl.classList.add('error');
+            playSound('error');
+        }
+
+        isFlipping = false;
+        flipBtn.disabled = false;
+        flipBtn.textContent = '🪙 FLIP';
+    }
+</script>
+{% endblock %}

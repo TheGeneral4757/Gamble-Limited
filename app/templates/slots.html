@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container slots-game">
+    <div class="game-header">
+        <h2>🎰 Slots</h2>
+        <a href="/" class="back-link">← Back to Lobby</a>
+    </div>
+
+    <div class="game-area">
+        <div class="slots-machine">
+            <div class="slots-display">
+                <div class="reel" id="reel-0">
+                    <span class="symbol">🍒</span>
+                </div>
+                <div class="reel" id="reel-1">
+                    <span class="symbol">🍋</span>
+                </div>
+                <div class="reel" id="reel-2">
+                    <span class="symbol">🍊</span>
+                </div>
+            </div>
+            <div class="slots-info">
+                <div id="result-message" class="result-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-controls">
+        <div class="bet-controls">
+            <label>Bet Amount</label>
+            <div class="bet-input-group">
+                <button class="bet-adjust" onclick="adjustBet(-10); playSound('click');">-</button>
+                <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                <button class="bet-adjust" onclick="adjustBet(10); playSound('click');">+</button>
+            </div>
+            <span class="bet-limits">Min: {{ min_bet }} | Max: {{ max_bet }}</span>
+        </div>
+        <button class="action-btn spin-btn" id="spin-btn" onclick="spin()">
+            🎰 SPIN
+        </button>
+    </div>
+
+    <div class="paytable">
+        <h3>Paytable</h3>
+        <div class="paytable-grid">
+            <div class="payout-row"><span>🍒🍒🍒</span><span>3x</span></div>
+            <div class="payout-row"><span>🍋🍋🍋</span><span>5x</span></div>
+            <div class="payout-row"><span>🍊🍊🍊</span><span>8x</span></div>
+            <div class="payout-row"><span>🍇🍇🍇</span><span>12x</span></div>
+            <div class="payout-row"><span>🔔🔔🔔</span><span>20x</span></div>
+            <div class="payout-row"><span>💎💎💎</span><span>40x</span></div>
+            <div class="payout-row jackpot"><span>7️⃣7️⃣7️⃣</span><span>77x</span></div>
+            <div class="payout-row"><span>2 Adjacent Match</span><span>1-15x</span></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '7️⃣'];
+    let isSpinning = false;
+
+    function adjustBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const newValue = Math.max({{ min_bet }}, Math.min({{ max_bet }}, parseInt(input.value || 0) + amount));
+    input.value = newValue;
+}
+
+    async function spin() {
+        if (isSpinning) return;
+
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        const spinBtn = document.getElementById('spin-btn');
+        const resultMsg = document.getElementById('result-message');
+
+        isSpinning = true;
+        spinBtn.disabled = true;
+        spinBtn.textContent = '🎰 SPINNING...';
+        resultMsg.textContent = '';
+        resultMsg.className = 'result-message';
+
+        // Play spin sound
+        playSound('spin');
+
+        // Animate reels
+        const reels = [0, 1, 2].map(i => document.getElementById(`reel-${i}`));
+        reels.forEach(reel => reel.classList.add('spinning'));
+
+        try {
+            const response = await fetch('/api/games/slots/spin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bet })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Spin failed');
+            }
+
+            // Stop reels one by one with delay and sound
+            for (let i = 0; i < 3; i++) {
+                await new Promise(r => setTimeout(r, 300 + i * 200));
+                reels[i].classList.remove('spinning');
+                reels[i].querySelector('.symbol').textContent = data.reels[i];
+                playSound('reelStop');
+            }
+
+            // Show result
+            await new Promise(r => setTimeout(r, 300));
+
+            if (data.win) {
+                resultMsg.textContent = `🎉 ${data.win_type.toUpperCase()}! +${data.payout} CR (${data.multiplier}x)`;
+                resultMsg.classList.add('win');
+
+                if (data.is_jackpot) {
+                    resultMsg.classList.add('jackpot');
+                    playSound('bigWin');
+                    document.querySelector('.slots-machine').classList.add('jackpot-animation');
+                    setTimeout(() => document.querySelector('.slots-machine').classList.remove('jackpot-animation'), 2000);
+                } else {
+                    playSound('win');
+                }
+            } else {
+                resultMsg.textContent = 'No win - Try again!';
+                resultMsg.classList.add('lose');
+                playSound('lose');
+            }
+
+            // Update balance
+            updateBalance(data.balance);
+
+        } catch (error) {
+            resultMsg.textContent = '❌ ' + error.message;
+            resultMsg.classList.add('error');
+            playSound('error');
+            reels.forEach(reel => reel.classList.remove('spinning'));
+        }
+
+        isSpinning = false;
+        spinBtn.disabled = false;
+        spinBtn.textContent = '🎰 SPIN';
+    }
+</script>
+{% endblock %}

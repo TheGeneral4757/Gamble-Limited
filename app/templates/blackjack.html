@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container blackjack-game">
+    <div class="game-header">
+        <h2>🃏 Blackjack</h2>
+        <a href="/" class="back-link">← Back to Lobby</a>
+    </div>
+
+    <div class="game-area">
+        <div class="blackjack-table">
+            <!-- Dealer Section -->
+            <div class="dealer-section">
+                <h3>Dealer <span id="dealer-value" class="hand-value"></span></h3>
+                <div class="hand" id="dealer-hand">
+                    <div class="card-placeholder">Deal to start</div>
+                </div>
+            </div>
+
+            <!-- Result Display -->
+            <div id="game-result" class="game-result"></div>
+
+            <!-- Player Section -->
+            <div class="player-section">
+                <h3>Your Hand <span id="player-value" class="hand-value"></span></h3>
+                <div class="hand" id="player-hand">
+                    <div class="card-placeholder">Place your bet</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-controls">
+        <!-- Betting Phase -->
+        <div id="betting-controls" class="controls-phase">
+            <div class="bet-controls">
+                <label>Bet Amount</label>
+                <div class="bet-input-group">
+                    <button class="bet-adjust" onclick="adjustBet(-20); playSound('click');">-</button>
+                    <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                    <button class="bet-adjust" onclick="adjustBet(20); playSound('click');">+</button>
+                </div>
+            </div>
+            <button class="action-btn deal-btn" onclick="deal()">🃏 DEAL</button>
+        </div>
+
+        <!-- Playing Phase -->
+        <div id="playing-controls" class="controls-phase" style="display: none;">
+            <button class="action-btn hit-btn" onclick="hit()">👆 HIT</button>
+            <button class="action-btn stand-btn" onclick="stand()">✋ STAND</button>
+        </div>
+
+        <!-- Game Over Phase -->
+        <div id="gameover-controls" class="controls-phase" style="display: none;">
+            <button class="action-btn new-game-btn" onclick="newGame()">🔄 NEW GAME</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentGameId = null;
+    let isProcessing = false;
+
+    function adjustBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const newValue = Math.max({{ min_bet }}, Math.min({{ max_bet }}, parseInt(input.value || 0) + amount));
+    input.value = newValue;
+}
+
+    function renderCard(card, delay = 0) {
+        const isRed = ['♥', '♦'].includes(card.suit);
+        const cardEl = document.createElement('div');
+        cardEl.className = `playing-card ${isRed ? 'red' : 'black'}`;
+        cardEl.innerHTML = `<span class="card-rank">${card.rank}</span><span class="card-suit">${card.suit}</span>`;
+
+        if (delay > 0) {
+            cardEl.style.animation = `deal-card 0.3s ease-out ${delay}ms both`;
+        }
+
+        return cardEl;
+    }
+
+    function renderHand(hand, elementId, animate = false) {
+        const container = document.getElementById(elementId);
+        container.innerHTML = '';
+        hand.forEach((card, i) => {
+            const cardEl = renderCard(card, animate ? i * 150 : 0);
+            container.appendChild(cardEl);
+            if (animate) {
+                setTimeout(() => playSound('cardDeal'), i * 150);
+            }
+        });
+    }
+
+    function showPhase(phase) {
+        ['betting', 'playing', 'gameover'].forEach(p => {
+            document.getElementById(`${p}-controls`).style.display = p === phase ? 'flex' : 'none';
+        });
+    }
+
+    async function deal() {
+        if (isProcessing) return;
+        isProcessing = true;
+
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        const resultEl = document.getElementById('game-result');
+        resultEl.textContent = '';
+        resultEl.className = 'game-result';
+
+        playSound('cardDeal');
+
+        try {
+            const response = await fetch('/api/games/blackjack/deal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bet })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Deal failed');
+            }
+
+            currentGameId = data.game_id;
+
+            // Animate dealing cards
+            renderHand(data.player_hand, 'player-hand', true);
+            document.getElementById('player-value').textContent = `(${data.player_value})`;
+
+            // Show only dealer's up card or full hand if game complete
+            if (data.status === 'complete') {
+                renderHand(data.dealer_hand, 'dealer-hand', true);
+                document.getElementById('dealer-value').textContent = `(${data.dealer_value})`;
+                setTimeout(() => showResult(data), 500);
+            } else {
+                const dealerEl = document.getElementById('dealer-hand');
+                dealerEl.innerHTML = '';
+                dealerEl.appendChild(renderCard(data.dealer_up_card, 100));
+                setTimeout(() => playSound('cardDeal'), 100);
+
+                const hiddenCard = document.createElement('div');
+                hiddenCard.className = 'playing-card face-down';
+                hiddenCard.textContent = '?';
+                hiddenCard.style.animation = 'deal-card 0.3s ease-out 250ms both';
+                dealerEl.appendChild(hiddenCard);
+                setTimeout(() => playSound('cardDeal'), 250);
+
+                document.getElementById('dealer-value').textContent = '';
+                showPhase('playing');
+            }
+
+            updateBalance(data.balance);
+
+        } catch (error) {
+            resultEl.textContent = '❌ ' + error.message;
+            resultEl.className = 'game-result error';
+            playSound('error');
+        }
+
+        isProcessing = false;
+    }
+
+    async function hit() {
+        if (isProcessing || !currentGameId) return;
+        isProcessing = true;
+
+        playSound('cardDeal');
+
+        try {
+            const response = await fetch('/api/games/blackjack/hit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ game_id: currentGameId })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.status === 'error') {
+                throw new Error(data.detail || data.error || 'Hit failed');
+            }
+
+            // Add new card with animation
+            const playerHand = document.getElementById('player-hand');
+            playerHand.appendChild(renderCard(data.new_card, 0));
+            document.getElementById('player-value').textContent = `(${data.player_value})`;
+
+            if (data.status === 'complete') {
+                playSound('cardFlip');
+                renderHand(data.dealer_hand, 'dealer-hand');
+                document.getElementById('dealer-value').textContent = `(${data.dealer_value})`;
+                showResult(data);
+            }
+
+            updateBalance(data.balance);
+
+        } catch (error) {
+            document.getElementById('game-result').textContent = '❌ ' + error.message;
+            document.getElementById('game-result').className = 'game-result error';
+            playSound('error');
+        }
+
+        isProcessing = false;
+    }
+
+    async function stand() {
+        if (isProcessing || !currentGameId) return;
+        isProcessing = true;
+
+        playSound('cardFlip');
+
+        try {
+            const response = await fetch('/api/games/blackjack/stand', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ game_id: currentGameId })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.status === 'error') {
+                throw new Error(data.detail || data.error || 'Stand failed');
+            }
+
+            // Reveal dealer hand with animation
+            const dealerEl = document.getElementById('dealer-hand');
+            dealerEl.innerHTML = '';
+
+            for (let i = 0; i < data.dealer_hand.length; i++) {
+                setTimeout(() => {
+                    dealerEl.appendChild(renderCard(data.dealer_hand[i]));
+                    playSound('cardDeal');
+                }, i * 200);
+            }
+
+            setTimeout(() => {
+                document.getElementById('dealer-value').textContent = `(${data.dealer_value})`;
+                showResult(data);
+            }, data.dealer_hand.length * 200 + 100);
+
+            updateBalance(data.balance);
+
+        } catch (error) {
+            document.getElementById('game-result').textContent = '❌ ' + error.message;
+            document.getElementById('game-result').className = 'game-result error';
+            playSound('error');
+        }
+
+        isProcessing = false;
+    }
+
+    function showResult(data) {
+        const resultEl = document.getElementById('game-result');
+        const outcomes = {
+            'blackjack': '🎉 BLACKJACK! +' + data.payout + ' CR',
+            'win': '🎉 YOU WIN! +' + data.payout + ' CR',
+            'lose': '😔 Dealer wins',
+            'bust': '💥 BUST! Over 21',
+            'dealer_bust': '🎉 Dealer busts! +' + data.payout + ' CR',
+            'dealer_blackjack': '😔 Dealer has Blackjack!',
+            'push': '🤝 PUSH - Bet returned'
+        };
+
+        resultEl.textContent = outcomes[data.outcome] || data.outcome;
+        resultEl.className = 'game-result ' + (data.payout > 0 ? 'win' : (data.outcome === 'push' ? 'push' : 'lose'));
+
+        // Play appropriate sound
+        if (data.payout > 0) {
+            playSound(data.outcome === 'blackjack' ? 'bigWin' : 'win');
+        } else if (data.outcome === 'push') {
+            playSound('ding');
+        } else {
+            playSound('lose');
+        }
+
+        showPhase('gameover');
+        currentGameId = null;
+    }
+
+    function newGame() {
+        currentGameId = null;
+        document.getElementById('player-hand').innerHTML = '<div class="card-placeholder">Place your bet</div>';
+        document.getElementById('dealer-hand').innerHTML = '<div class="card-placeholder">Deal to start</div>';
+        document.getElementById('player-value').textContent = '';
+        document.getElementById('dealer-value').textContent = '';
+        document.getElementById('game-result').textContent = '';
+        document.getElementById('game-result').className = 'game-result';
+        showPhase('betting');
+        playSound('click');
+    }
+</script>
+{% endblock %}

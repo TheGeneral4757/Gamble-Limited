@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container roulette-game">
+    <div class="game-header">
+        <h2>🎡 Roulette</h2>
+        <a href="/" class="back-link">← Back to Lobby</a>
+    </div>
+
+    <div class="game-area">
+        <div class="roulette-wheel-container">
+            <div class="roulette-wheel" id="wheel">
+                <div class="wheel-center">
+                    <span id="result-number">?</span>
+                </div>
+            </div>
+            <div class="ball" id="ball"></div>
+        </div>
+
+        <div id="spin-result" class="spin-result"></div>
+    </div>
+
+    <div class="betting-board">
+        <h3>Place Your Bet</h3>
+
+        <div class="bet-type-selector">
+            <button class="bet-type-btn active" data-type="red" onclick="selectBetType('red', '')">🔴 Red (1:1)</button>
+            <button class="bet-type-btn" data-type="black" onclick="selectBetType('black', '')">⚫ Black (1:1)</button>
+            <button class="bet-type-btn" data-type="odd" onclick="selectBetType('odd', '')">Odd (1:1)</button>
+            <button class="bet-type-btn" data-type="even" onclick="selectBetType('even', '')">Even (1:1)</button>
+            <button class="bet-type-btn" data-type="low" onclick="selectBetType('low', '')">1-18 (1:1)</button>
+            <button class="bet-type-btn" data-type="high" onclick="selectBetType('high', '')">19-36 (1:1)</button>
+        </div>
+
+        <div class="dozen-bets">
+            <button class="dozen-btn" data-type="dozen" data-value="1" onclick="selectBetType('dozen', '1')">1st 12
+                (2:1)</button>
+            <button class="dozen-btn" data-type="dozen" data-value="2" onclick="selectBetType('dozen', '2')">2nd 12
+                (2:1)</button>
+            <button class="dozen-btn" data-type="dozen" data-value="3" onclick="selectBetType('dozen', '3')">3rd 12
+                (2:1)</button>
+        </div>
+
+        <div class="straight-bet">
+            <label>Straight Up (35:1):</label>
+            <input type="number" id="straight-number" min="0" max="36" placeholder="0-36"
+                onchange="selectBetType('straight', this.value)">
+        </div>
+    </div>
+
+    <div class="game-controls">
+        <div class="bet-controls">
+            <label>Bet Amount</label>
+            <div class="bet-input-group">
+                <button class="bet-adjust" onclick="adjustBet(-5); playSound('click');">-</button>
+                <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                <button class="bet-adjust" onclick="adjustBet(5); playSound('click');">+</button>
+            </div>
+            <div class="selected-bet">
+                Bet: <span id="current-bet-type">Red</span>
+            </div>
+        </div>
+        <button class="action-btn spin-btn" id="spin-btn" onclick="spinWheel()">🎡 SPIN</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+    let currentBetType = 'red';
+    let currentBetValue = '';
+    let isSpinning = false;
+
+    function adjustBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const newValue = Math.max({{ min_bet }}, Math.min({{ max_bet }}, parseInt(input.value || 0) + amount));
+    input.value = newValue;
+}
+
+    function selectBetType(type, value) {
+        currentBetType = type;
+        currentBetValue = value;
+
+        playSound('click');
+
+        // Update UI
+        document.querySelectorAll('.bet-type-btn, .dozen-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.type === type && (!value || btn.dataset.value === value)) {
+                btn.classList.add('active');
+            }
+        });
+
+        let displayText = type.charAt(0).toUpperCase() + type.slice(1);
+        if (value) displayText += ` (${value})`;
+        document.getElementById('current-bet-type').textContent = displayText;
+    }
+
+    function getColorClass(number) {
+        if (number === 0) return 'green';
+        return RED_NUMBERS.includes(number) ? 'red' : 'black';
+    }
+
+    async function spinWheel() {
+        if (isSpinning) return;
+
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        const spinBtn = document.getElementById('spin-btn');
+        const resultEl = document.getElementById('spin-result');
+        const wheel = document.getElementById('wheel');
+        const resultNumber = document.getElementById('result-number');
+
+        isSpinning = true;
+        spinBtn.disabled = true;
+        spinBtn.textContent = '🎡 SPINNING...';
+        resultEl.textContent = '';
+        resultEl.className = 'spin-result';
+
+        // Spin animation and sound
+        wheel.classList.add('spinning');
+        resultNumber.textContent = '?';
+        resultNumber.className = '';
+        playSound('wheelSpin');
+
+        try {
+            const response = await fetch('/api/games/roulette/spin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bet,
+                    bet_type: currentBetType,
+                    bet_value: currentBetValue
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Spin failed');
+            }
+
+            // Wait for spin animation
+            await new Promise(r => setTimeout(r, 2500));
+
+            wheel.classList.remove('spinning');
+            playSound('ballLand');
+
+            // Show result
+            resultNumber.textContent = data.number;
+            resultNumber.className = getColorClass(data.number);
+
+            if (data.win) {
+                resultEl.innerHTML = `🎉 <span class="${data.color}">${data.number}</span> - YOU WIN! +${data.payout} CR (${data.multiplier}x)`;
+                resultEl.classList.add('win');
+                playSound('win');
+            } else {
+                resultEl.innerHTML = `<span class="${data.color}">${data.number}</span> - No win`;
+                resultEl.classList.add('lose');
+                playSound('lose');
+            }
+
+            updateBalance(data.balance);
+
+        } catch (error) {
+            wheel.classList.remove('spinning');
+            resultEl.textContent = '❌ ' + error.message;
+            resultEl.classList.add('error');
+            playSound('error');
+        }
+
+        isSpinning = false;
+        spinBtn.disabled = false;
+        spinBtn.textContent = '🎡 SPIN';
+    }
+</script>
+{% endblock %}

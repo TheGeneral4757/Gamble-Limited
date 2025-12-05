@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container">
+    <div class="game-header">
+        <h2>{{ game_name|title }}</h2>
+        <a href="/" class="back-link">← Back to Lobby</a>
+    </div>
+
+    <div class="game-area">
+        <div class="game-placeholder">
+            <p>Game Interface Loading...</p>
+            <p class="subtext">This is a placeholder for the {{ game_name }} game canvas.</p>
+        </div>
+    </div>
+
+    <div class="game-controls">
+        <div class="bet-controls">
+            <label>Bet Amount</label>
+            <input type="number" value="10" min="1">
+        </div>
+        <button class="action-btn">Place Bet</button>
+    </div>
+</div>
+{% endblock %}

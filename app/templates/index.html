@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <h2>Welcome to the Future of Gambling</h2>
+    <p>Experience true randomness in a premium environment.</p>
+</section>
+
+<section class="games-grid">
+    {% for game_name, game_config in games.items() %}
+    {% if game_config.enabled %}
+    <div class="game-card" onclick="window.location='/game/{{ game_name }}'">
+        <div class="game-icon">
+            <div class="icon-circle">
+                {% if game_name == 'slots' %}🎰
+                {% elif game_name == 'blackjack' %}🃏
+                {% elif game_name == 'roulette' %}🎡
+                {% elif game_name == 'plinko' %}⚪
+                {% elif game_name == 'coinflip' %}🪙
+                {% else %}{{ game_name[0]|upper }}
+                {% endif %}
+            </div>
+        </div>
+        <h3>{{ game_name|title }}</h3>
+        <p class="bet-range">Bet: {{ game_config.min_bet }} - {{ game_config.max_bet }} CR</p>
+        <a href="/game/{{ game_name }}" class="play-btn">Play Now</a>
+    </div>
+    {% endif %}
+    {% endfor %}
+</section>
+
+<section class="info-section">
+    <div class="info-grid">
+        <div class="info-card">
+            <h3>🔒 Provably Fair</h3>
+            <p>All games use cryptographically secure random number generation.</p>
+        </div>
+        <div class="info-card">
+            <h3>💎 Premium Experience</h3>
+            <p>Smooth animations and instant payouts on every win.</p>
+        </div>
+        <div class="info-card">
+            <h3>📊 Live Stats</h3>
+            <p>Track your balance and transaction history in real-time.</p>
+        </div>
+    </div>
+</section>
+{% endblock %}

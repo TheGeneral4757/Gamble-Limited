@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="admin-panel">
+    <h2>🔐 Admin Control Panel</h2>
+    <p class="admin-welcome">Welcome, <strong>{{ username }}</strong></p>
+
+    <div class="admin-grid">
+        <!-- System Status -->
+        <div class="admin-card">
+            <h3>📊 System Status</h3>
+            <div class="status-grid" id="status-grid">
+                <div class="status-item">
+                    <span class="label">Server</span>
+                    <span class="value status-online">Online</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">RNG</span>
+                    <span class="value status-online">Active</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Database</span>
+                    <span class="value status-online">Connected</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Users</span>
+                    <span class="value" id="user-count">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Economy Stats -->
+        <div class="admin-card">
+            <h3>💰 Economy Stats</h3>
+            <div class="status-grid" id="economy-stats">
+                <div class="status-item">
+                    <span class="label">Exchange Rate</span>
+                    <span class="value" id="exchange-rate">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Total Cash</span>
+                    <span class="value" id="total-cash">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Total Credits</span>
+                    <span class="value" id="total-credits">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Transactions</span>
+                    <span class="value" id="tx-count">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Management -->
+        <div class="admin-card wide">
+            <h3>👥 User Management</h3>
+            <div class="user-actions">
+                <div class="action-group">
+                    <label>User ID:</label>
+                    <input type="text" id="target-user-id" placeholder="Enter user ID">
+                </div>
+                <div class="action-group">
+                    <label>Grant Funds:</label>
+                    <input type="number" id="grant-cash" placeholder="Cash" value="0">
+                    <input type="number" id="grant-credits" placeholder="Credits" value="0">
+                    <button class="admin-btn grant" onclick="grantFunds()">💸 Grant</button>
+                </div>
+                <div class="action-group">
+                    <button class="admin-btn reset" onclick="resetUser()">🔄 Reset User</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users List -->
+        <div class="admin-card wide">
+            <h3>📋 All Users</h3>
+            <div class="users-table-container">
+                <table class="users-table" id="users-table">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Cash</th>
+                            <th>Credits</th>
+                            <th>Last Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody">
+                        <tr>
+                            <td colspan="5">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="admin-card danger-zone">
+            <h3>⚠️ Danger Zone</h3>
+            <p class="warning-text">These actions cannot be undone!</p>
+            <button class="admin-btn danger" onclick="clearAllData()">🗑️ Clear All Data</button>
+        </div>
+
+        <!-- Session -->
+        <div class="admin-card">
+            <h3>🔑 Session</h3>
+            <a href="/logout" class="admin-btn logout">🚪 Logout</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadStats() {
+        try {
+            const response = await fetch('/admin/stats');
+            if (!response.ok) throw new Error('Not authorized');
+
+            const data = await response.json();
+
+            document.getElementById('user-count').textContent = data.stats.users?.user_count || 0;
+            document.getElementById('exchange-rate').textContent = data.exchange_rate + ' CR/$';
+            document.getElementById('total-cash').textContent = '$' + (data.stats.users?.total_cash || 0).toFixed(2);
+            document.getElementById('total-credits').textContent = (data.stats.users?.total_credits || 0).toFixed(2) + ' CR';
+            document.getElementById('tx-count').textContent = data.stats.transactions?.tx_count || 0;
+
+        } catch (error) {
+            console.error('Failed to load stats:', error);
+        }
+    }
+
+    async function loadUsers() {
+        try {
+            const response = await fetch('/admin/users');
+            if (!response.ok) throw new Error('Not authorized');
+
+            const data = await response.json();
+            const tbody = document.getElementById('users-tbody');
+
+            if (data.users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">No users yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.users.map(user => `
+            <tr>
+                <td><code>${user.id}</code></td>
+                <td>$${user.cash.toFixed(2)}</td>
+                <td>${user.credits.toFixed(2)} CR</td>
+                <td>${new Date(user.updated_at).toLocaleString()}</td>
+                <td>
+                    <button class="table-btn" onclick="selectUser('${user.id}')">Select</button>
+                </td>
+            </tr>
+        `).join('');
+
+        } catch (error) {
+            document.getElementById('users-tbody').innerHTML = '<tr><td colspan="5">Error loading users</td></tr>';
+        }
+    }
+
+    function selectUser(userId) {
+        document.getElementById('target-user-id').value = userId;
+    }
+
+    async function grantFunds() {
+        const userId = document.getElementById('target-user-id').value;
+        const cash = parseFloat(document.getElementById('grant-cash').value) || 0;
+        const credits = parseFloat(document.getElementById('grant-credits').value) || 0;
+
+        if (!userId) {
+            alert('Please enter a user ID');
+            return;
+        }
+
+        try {
+            const response = await fetch('/admin/users/grant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, cash, credits })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert(`Granted $${cash} cash and ${credits} credits to ${userId}`);
+                loadStats();
+                loadUsers();
+            } else {
+                alert('Error: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    async function resetUser() {
+        const userId = document.getElementById('target-user-id').value;
+
+        if (!userId) {
+            alert('Please enter a user ID');
+            return;
+        }
+
+        if (!confirm(`Reset ${userId} to starting balance?`)) return;
+
+        try {
+            const response = await fetch('/admin/users/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+
+            if (response.ok) {
+                alert(`User ${userId} has been reset`);
+                loadStats();
+                loadUsers();
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    async function clearAllData() {
+        if (!confirm('⚠️ This will DELETE ALL user data. Are you sure?')) return;
+        if (!confirm('⚠️ FINAL WARNING: This cannot be undone!')) return;
+
+        try {
+            const response = await fetch('/admin/economy/clear', {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                alert('All data has been cleared');
+                loadStats();
+                loadUsers();
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    // Load on page load
+    loadStats();
+    loadUsers();
+    setInterval(loadStats, 30000); // Refresh every 30s
+</script>
+{% endblock %}

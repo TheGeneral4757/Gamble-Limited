@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container" style="max-width: 400px; margin-top: 50px;">
+    <div class="game-header" style="justify-content: center;">
+        <h2>Admin Login</h2>
+    </div>
+
+    <div class="game-area" style="height: auto; padding: 40px; display: block;">
+        <form action="/login" method="post" style="display: flex; flex-direction: column; gap: 20px;">
+            <div class="bet-controls" style="width: 100%;">
+                <label style="display: block; margin-bottom: 5px;">Username</label>
+                <input type="text" name="username" required style="width: 100%; padding: 12px;">
+            </div>
+            <div class="bet-controls" style="width: 100%;">
+                <label style="display: block; margin-bottom: 5px;">Password</label>
+                <input type="password" name="password" required style="width: 100%; padding: 12px;">
+            </div>
+            {% if error %}
+            <div style="color: #ff5555; text-align: center;">{{ error }}</div>
+            {% endif %}
+            <button type="submit" class="action-btn" style="width: 100%; margin-top: 10px;">Login</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+    <meta name="description" content="Premium online casino with provably fair games and true RNG.">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="main-header">
+            <div class="logo">
+                <a href="/" style="text-decoration: none;">
+                    <h1>{{ app_name }}</h1>
+                </a>
+            </div>
+            <nav>
+                <a href="/" class="nav-link">Home</a>
+                <a href="/exchange" class="nav-link">Exchange</a>
+                <a href="/admin" class="nav-link">Admin</a>
+            </nav>
+            <div class="user-stats">
+                <span class="currency cash">$<span id="cash-balance">---</span></span>
+                <span class="currency credits">CR <span id="credits-balance">---</span></span>
+            </div>
+        </header>
+
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="main-footer">
+            <p>&copy; 2025 {{ app_name }}. Provably Fair & True RNG.</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

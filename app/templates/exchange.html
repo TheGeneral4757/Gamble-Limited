@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="exchange-container">
+    <div class="game-header">
+        <h2>💱 Conversion Hub</h2>
+        <a href="/" class="back-link">← Back to Lobby</a>
+    </div>
+
+    <div class="exchange-grid">
+        <!-- Current Rates Card -->
+        <div class="exchange-card rates-card">
+            <h3>📊 Current Exchange Rates</h3>
+            <div class="rate-display">
+                <div class="rate-item">
+                    <span class="rate-label">Cash → Credits</span>
+                    <span class="rate-value" id="cash-to-credits">$1 = <span id="rate-credits">--</span> CR</span>
+                </div>
+                <div class="rate-item">
+                    <span class="rate-label">Credits → Cash</span>
+                    <span class="rate-value" id="credits-to-cash"><span id="rate-cash">--</span> CR = $1</span>
+                </div>
+            </div>
+            <div class="rate-info">
+                <p>💡 Rates fluctuate ±5% from base rate</p>
+                <p>⏱️ Rates update every 30 seconds</p>
+            </div>
+            <button class="refresh-btn" onclick="refreshRates()">🔄 Refresh Rates</button>
+        </div>
+
+        <!-- Convert Cash to Credits -->
+        <div class="exchange-card convert-card">
+            <h3>💵 Cash → Credits</h3>
+            <div class="convert-form">
+                <div class="input-group">
+                    <label>Amount to Convert</label>
+                    <div class="input-with-symbol">
+                        <span class="symbol">$</span>
+                        <input type="number" id="cash-amount" min="1" value="100" onchange="updatePreview('cash')">
+                    </div>
+                </div>
+                <div class="preview">
+                    <span>You'll receive:</span>
+                    <span class="preview-value" id="credits-preview">-- CR</span>
+                </div>
+                <button class="action-btn convert-btn" onclick="convertCurrency('cash')">
+                    Convert to Credits
+                </button>
+            </div>
+        </div>
+
+        <!-- Convert Credits to Cash -->
+        <div class="exchange-card convert-card">
+            <h3>🎰 Credits → Cash</h3>
+            <div class="convert-form">
+                <div class="input-group">
+                    <label>Amount to Convert</label>
+                    <div class="input-with-symbol">
+                        <span class="symbol">CR</span>
+                        <input type="number" id="credits-amount" min="1" value="100"
+                            onchange="updatePreview('credits')">
+                    </div>
+                </div>
+                <div class="preview">
+                    <span>You'll receive:</span>
+                    <span class="preview-value" id="cash-preview">$--</span>
+                </div>
+                <button class="action-btn convert-btn" onclick="convertCurrency('credits')">
+                    Convert to Cash
+                </button>
+            </div>
+        </div>
+
+        <!-- Your Balance -->
+        <div class="exchange-card balance-card">
+            <h3>👛 Your Balance</h3>
+            <div class="balance-display">
+                <div class="balance-item">
+                    <span class="balance-label">Cash</span>
+                    <span class="balance-value cash">$<span id="your-cash">--</span></span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Credits</span>
+                    <span class="balance-value credits"><span id="your-credits">--</span> CR</span>
+                </div>
+            </div>
+            <div class="total-value">
+                <span>Total Value (in Cash):</span>
+                <span class="total" id="total-value">$--</span>
+            </div>
+        </div>
+
+        <!-- Rate History -->
+        <div class="exchange-card history-card wide">
+            <h3>📈 Rate Tips</h3>
+            <div class="tips-grid">
+                <div class="tip">
+                    <span class="tip-icon">⬆️</span>
+                    <span class="tip-text">Convert cash to credits when rate is <strong>high</strong></span>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">⬇️</span>
+                    <span class="tip-text">Convert credits to cash when rate is <strong>low</strong></span>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">🎲</span>
+                    <span class="tip-text">Play games with credits to keep cash safe</span>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">💰</span>
+                    <span class="tip-text">Base rate is 10 CR per $1</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="exchange-result" class="exchange-result"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentRate = 10;
+
+    async function refreshRates() {
+        try {
+            const response = await fetch('/api/economy/rate');
+            const data = await response.json();
+            currentRate = data.rate;
+
+            document.getElementById('rate-credits').textContent = currentRate.toFixed(2);
+            document.getElementById('rate-cash').textContent = currentRate.toFixed(2);
+
+            updatePreview('cash');
+            updatePreview('credits');
+            updateTotalValue();
+
+            playSound('ding');
+        } catch (error) {
+            console.error('Failed to refresh rates:', error);
+        }
+    }
+
+    function updatePreview(type) {
+        if (type === 'cash') {
+            const amount = parseFloat(document.getElementById('cash-amount').value) || 0;
+            const credits = amount * currentRate;
+            document.getElementById('credits-preview').textContent = credits.toFixed(2) + ' CR';
+        } else {
+            const amount = parseFloat(document.getElementById('credits-amount').value) || 0;
+            const cash = amount / currentRate;
+            document.getElementById('cash-preview').textContent = '$' + cash.toFixed(2);
+        }
+    }
+
+    async function convertCurrency(fromType) {
+        const resultEl = document.getElementById('exchange-result');
+        resultEl.textContent = '';
+        resultEl.className = 'exchange-result';
+
+        let amount;
+        if (fromType === 'cash') {
+            amount = parseFloat(document.getElementById('cash-amount').value);
+        } else {
+            amount = parseFloat(document.getElementById('credits-amount').value);
+        }
+
+        if (!amount || amount <= 0) {
+            resultEl.textContent = '❌ Enter a valid amount';
+            resultEl.classList.add('error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/economy/exchange', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ from_currency: fromType, amount })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Exchange failed');
+            }
+
+            if (data.success) {
+                const received = data.received.toFixed(2);
+                const currency = fromType === 'cash' ? 'credits' : 'cash';
+                resultEl.innerHTML = `✅ Converted! Received ${currency === 'cash' ? '$' : ''}${received}${currency === 'credits' ? ' CR' : ''}`;
+                resultEl.classList.add('success');
+
+                updateBalance(data.balance);
+                updateLocalBalance(data.balance);
+                playSound('coin');
+            } else {
+                throw new Error(data.error || 'Exchange failed');
+            }
+
+        } catch (error) {
+            resultEl.textContent = '❌ ' + error.message;
+            resultEl.classList.add('error');
+            playSound('error');
+        }
+    }
+
+    function updateLocalBalance(balance) {
+        document.getElementById('your-cash').textContent = balance.cash.toFixed(2);
+        document.getElementById('your-credits').textContent = balance.credits.toFixed(2);
+        updateTotalValue();
+    }
+
+    function updateTotalValue() {
+        const cash = parseFloat(document.getElementById('your-cash').textContent) || 0;
+        const credits = parseFloat(document.getElementById('your-credits').textContent) || 0;
+        const total = cash + (credits / currentRate);
+        document.getElementById('total-value').textContent = '$' + total.toFixed(2);
+    }
+
+    async function loadBalance() {
+        try {
+            const response = await fetch('/api/economy/balance');
+            const data = await response.json();
+            updateLocalBalance(data);
+        } catch (error) {
+            console.error('Failed to load balance:', error);
+        }
+    }
+
+    // Initialize
+    refreshRates();
+    loadBalance();
+    setInterval(refreshRates, 30000);
+</script>
+{% endblock %}

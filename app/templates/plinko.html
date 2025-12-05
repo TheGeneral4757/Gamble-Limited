@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container plinko-game">
+    <div class="game-header">
+        <h2>⚪ Plinko</h2>
+        <a href="/" class="back-link">← Back to Lobby</a>
+    </div>
+
+    <div class="game-area">
+        <div class="plinko-board" id="plinko-board">
+            <!-- Pegs will be generated dynamically -->
+            <div class="ball" id="plinko-ball" style="display: none;">⚪</div>
+        </div>
+
+        <div class="multiplier-slots" id="multiplier-slots">
+            <!-- Multipliers shown at bottom -->
+        </div>
+
+        <div id="plinko-result" class="plinko-result"></div>
+    </div>
+
+    <div class="game-controls">
+        <div class="bet-controls">
+            <label>Bet Amount</label>
+            <div class="bet-input-group">
+                <button class="bet-adjust" onclick="adjustBet(-1); playSound('click');">-</button>
+                <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                <button class="bet-adjust" onclick="adjustBet(1); playSound('click');">+</button>
+            </div>
+        </div>
+
+        <div class="rows-selector">
+            <label>Rows:</label>
+            <select id="rows-select" onchange="initBoard(parseInt(this.value)); playSound('click');">
+                <option value="8">8 Rows</option>
+                <option value="12">12 Rows</option>
+                <option value="16" selected>16 Rows</option>
+            </select>
+        </div>
+
+        <button class="action-btn drop-btn" id="drop-btn" onclick="dropBall()">⚪ DROP</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Rebalanced multipliers - max 16x, mostly losses in center
+    const MULTIPLIERS = {
+        16: [16, 9, 2, 1.4, 1.1, 0.5, 0.3, 0.5, 0.3, 0.5, 0.3, 0.5, 1.1, 1.4, 2, 9, 16],
+        12: [10, 3, 1.5, 0.6, 0.4, 0.3, 0.3, 0.4, 0.6, 1.5, 3, 10],
+        8: [5.6, 2.1, 0.5, 0.2, 0.2, 0.5, 2.1, 5.6]
+    };
+
+    let isDropping = false;
+
+    function adjustBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const newValue = Math.max({{ min_bet }}, Math.min({{ max_bet }}, parseInt(input.value || 0) + amount));
+    input.value = newValue;
+}
+
+    function initBoard(rows) {
+        const board = document.getElementById('plinko-board');
+        const slotsContainer = document.getElementById('multiplier-slots');
+        const multipliers = MULTIPLIERS[rows] || MULTIPLIERS[16];
+
+        // Generate pegs
+        board.innerHTML = '<div class="ball" id="plinko-ball" style="display: none;">⚪</div>';
+
+        for (let row = 0; row < rows; row++) {
+            const pegRow = document.createElement('div');
+            pegRow.className = 'peg-row';
+            pegRow.style.setProperty('--row', row);
+
+            for (let peg = 0; peg <= row; peg++) {
+                const pegEl = document.createElement('div');
+                pegEl.className = 'peg';
+                pegRow.appendChild(pegEl);
+            }
+            board.appendChild(pegRow);
+        }
+
+        // Generate multiplier slots with proper coloring
+        slotsContainer.innerHTML = multipliers.map((mult, i) => {
+            let colorClass = 'low';  // Red - loss
+            if (mult >= 2) colorClass = 'high';  // Green - profit
+            else if (mult >= 1) colorClass = 'medium';  // Yellow - break even ish
+            return `<div class="mult-slot ${colorClass}" data-index="${i}">${mult}x</div>`;
+        }).join('');
+    }
+
+    async function dropBall() {
+        if (isDropping) return;
+
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        const rows = parseInt(document.getElementById('rows-select').value);
+        const dropBtn = document.getElementById('drop-btn');
+        const resultEl = document.getElementById('plinko-result');
+        const ball = document.getElementById('plinko-ball');
+
+        isDropping = true;
+        dropBtn.disabled = true;
+        dropBtn.textContent = '⚪ DROPPING...';
+        resultEl.textContent = '';
+        resultEl.className = 'plinko-result';
+
+        try {
+            const response = await fetch('/api/games/plinko/drop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bet, rows })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Drop failed');
+            }
+
+            // Animate ball dropping
+            ball.style.display = 'block';
+            ball.style.left = '50%';
+            ball.style.top = '0';
+
+            let position = 0;
+            for (let i = 0; i < data.path.length; i++) {
+                await new Promise(r => setTimeout(r, 80));
+                position += data.path[i] === 'L' ? -1 : 1;
+
+                const progress = (i + 1) / data.path.length;
+                const leftPercent = 50 + (position * 3);
+                ball.style.left = leftPercent + '%';
+                ball.style.top = (progress * 85) + '%';
+
+                // Play bounce sound
+                playSound('ballDrop');
+            }
+
+            // Highlight winning slot
+            await new Promise(r => setTimeout(r, 200));
+            playSound('ballLand');
+
+            const slots = document.querySelectorAll('.mult-slot');
+            if (slots[data.final_slot]) {
+                slots[data.final_slot].classList.add('winner');
+            }
+
+            // Show result
+            if (data.big_win) {
+                resultEl.textContent = `🎉 ${data.multiplier}x - BIG WIN! +${data.payout} CR`;
+                resultEl.classList.add('win');
+                playSound('bigWin');
+            } else if (data.win) {
+                resultEl.textContent = `✅ ${data.multiplier}x - You win! +${data.payout} CR`;
+                resultEl.classList.add('win');
+                playSound('win');
+            } else {
+                resultEl.textContent = `${data.multiplier}x - ${data.payout} CR returned (${data.net} net)`;
+                resultEl.classList.add('partial');
+                playSound('lose');
+            }
+
+            updateBalance(data.balance);
+
+            // Reset after delay
+            await new Promise(r => setTimeout(r, 1500));
+            ball.style.display = 'none';
+            slots.forEach(s => s.classList.remove('winner'));
+
+        } catch (error) {
+            resultEl.textContent = '❌ ' + error.message;
+            resultEl.classList.add('error');
+            ball.style.display = 'none';
+            playSound('error');
+        }
+
+        isDropping = false;
+        dropBtn.disabled = false;
+        dropBtn.textContent = '⚪ DROP';
+    }
+
+    // Initialize on load
+    initBoard(16);
+</script>
+{% endblock %}

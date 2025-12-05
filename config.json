@@ -1,0 +1,47 @@
+{
+    "server": {
+        "host": "127.0.0.1",
+        "port": 8000,
+        "debug": true,
+        "name": "Gamble Limited"
+    },
+    "security": {
+        "admin_username": "admin",
+        "admin_password_hash": "$2b$12$v.4ehgJvT8yRvQhwsbmGgeOkm0s/fndPTQ.0WQot7IogL9gpDNsgG",
+        "secret_key": "CHANGE_THIS_IN_PRODUCTION_PLEASE"
+    },
+    "economy": {
+        "starting_cash": 1000.0,
+        "starting_credits": 500.0,
+        "base_exchange_rate": 10.0,
+        "fluctuation_range": 0.05
+    },
+    "games": {
+        "slots": {
+            "enabled": true,
+            "min_bet": 10,
+            "max_bet": 1000,
+            "payout_rate": 0.95
+        },
+        "blackjack": {
+            "enabled": true,
+            "min_bet": 20,
+            "max_bet": 2000
+        },
+        "roulette": {
+            "enabled": true,
+            "min_bet": 5,
+            "max_bet": 5000
+        },
+        "plinko": {
+            "enabled": true,
+            "min_bet": 1,
+            "max_bet": 1000
+        },
+        "coinflip": {
+            "enabled": true,
+            "min_bet": 1,
+            "max_bet": 10000
+        }
+    }
+}
