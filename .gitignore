@@ -34,10 +34,12 @@ env/
 *~
 
 # Data & Database
-data/
-*.db
-*.sqlite
-*.sqlite3
+
+# Data & Database
+# data/ (User wants to persist data)
+# *.db
+# *.sqlite
+# *.sqlite3
 
 # Logs
 *.log
