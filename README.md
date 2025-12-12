@@ -28,7 +28,7 @@ A full-featured, self-hosted casino gaming platform built with Python and FastAP
 - **Big Win Announcements:** Major wins are announced globally to all players.
 
 ### 👤 User System
-- **Simple Login:** Username-based login for players, no password required.
+- **Simple Login:** Username and passsord based login for players.
 - **Persistent Balances:** Cash and Credits are stored in a SQLite database.
 - **Secure Session Management:** Uses secure, cookie-based sessions.
 
