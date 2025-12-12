@@ -1,226 +1,227 @@
 # 🎰 Gamble Limited - Casino Platform
 
-A full-featured casino gaming platform built with Python FastAPI. Features multiple games, user accounts, admin management, and dynamic economy.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-0.100+-green.svg" alt="FastAPI">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
+</p>
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+A full-featured, self-hosted casino gaming platform built with Python and FastAPI. Features multiple games with dynamic odds, real-time updates via WebSockets, a complete user and admin management system, and a dynamic in-game economy.
+
+---
 
 ## ✨ Features
 
-### 🎮 Games
-| Game | Description | Odds |
-|------|-------------|------|
-| **🎰 Slots** | 3-reel slot machine with symbols (🍒🍋🍊🔔⭐💎) | RTP ~95% |
-| **🃏 Blackjack** | Classic 21 - Hit, Stand, Double Down | House edge ~2% |
-| **🎡 Roulette** | European style - Red/Black, Odd/Even, Dozens, Straight | Standard odds |
-| **📍 Plinko** | Ball drop through pegs with multiplier slots | House edge ~15% |
-| **🪙 Coinflip** | 50/50 heads or tails | 1.95x payout |
+### 🎮 Games Included
+| Game | Description | Dynamic Odds Control |
+|------|-------------|----------------------|
+| **🎰 Slots** | 3-reel slot machine with configurable symbol weights and payouts. | Yes |
+| **🃏 Blackjack** | Classic 21 - Hit, Stand, Double Down. | No |
+| **🎡 Roulette** | European style - Red/Black, Odd/Even, Dozens, Straight bets. | Yes |
+| **📍 Plinko** | Ball drop with configurable center bias and peg multipliers. | Yes |
+| **🪙 Coinflip** | 50/50 heads or tails with adjustable player odds. | Yes |
+| **🎉 Gamble Friday** | Special high-stakes event, configurable and testable. | Yes |
+
+### 🚀 Real-time Features (WebSockets)
+- **Live Global Chat:** A chat room for all connected players.
+- **Instant Balance Updates:** Your balance updates in real-time after every game.
+- **Big Win Announcements:** Major wins are announced globally to all players.
 
 ### 👤 User System
-- **Username-based login** - No password required for players
-- **Create new accounts** instantly
-- **Persistent balances** - Cash and Credits tracked in SQLite
-- **Session management** via cookies
+- **Simple Login:** Username-based login for players, no password required.
+- **Persistent Balances:** Cash and Credits are stored in a SQLite database.
+- **Secure Session Management:** Uses secure, cookie-based sessions.
 
-### 🔐 Admin Features
-- **Password-protected admin panel** (`/admin`)
-- **Infinite funds** for admin accounts
-- **User management**:
-  - View all users with stats
-  - Grant cash/credits to any user
-  - Reset user balances to default
-  - Delete users permanently
-  - Clear all platform data
-- **Platform statistics**: Total users, games played, wagered amounts
-- **Leaderboard**: Top players by winnings
-- **Game breakdown**: Per-game statistics
-- **Change admin password**
+### 🔐 Admin Panel
+- **Password-Protected:** Secure admin panel at a configurable path.
+- **User Management:** View all users, grant funds, reset balances, or delete users.
+- **Platform Statistics:** See totals for users, games played, and amounts wagered.
+- **Leaderboard:** View the top players by winnings.
+- **Live Odds Configuration:** Modify game odds in real-time by editing `ODDS-CHANGER.json`.
+- **Data Management:** Clear all platform data with a single click.
 
 ### 💱 Economy
-- **Dual currency**: Cash ($) and Credits (CR)
-- **Dynamic exchange rates**: Fluctuate ±5% every 30 seconds
-- **Conversion penalty**: Frequent converters get worse rates (up to 15%)
-- **Starting balance**: $1000 cash + 500 credits
+- **Dual Currency:** In-game economy with Cash ($) and Credits (CR).
+- **Dynamic Exchange Rates:** The exchange rate between Cash and Credits fluctuates automatically.
+- **Starting Balance:** New users start with a configurable amount of both currencies.
 
-## 🚀 Quick Start
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 - Python 3.10+
-- pip
+- `pip` for installing dependencies
+- Docker and Docker Compose (for containerized deployment)
 
-### Installation
+### Local Installation (for Development)
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/yourusername/RNG-THING.git
+    cd RNG-THING
+    ```
 
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Configure your environment:**
+    Copy `.env.example` to `.env`. The default settings are suitable for local testing.
+    ```bash
+    cp .env.example .env
+    ```
+
+4.  **Run the development server:**
+    ```bash
+    python -m app.main
+    ```
+    The server will start at `http://localhost:8000`.
+
+---
+
+## 🐳 Docker Deployment (Recommended for Production)
+
+This guide is for Debian-based Linux distributions like Ubuntu.
+
+### 1. Install Docker and Docker Compose
+If you don't have Docker installed, you can use the official convenience script:
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/RNG-THING.git
-cd RNG-THING
+# Download and run the Docker installation script
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the server
-python -m app.main
+# Install Docker Compose
+sudo apt-get update
+sudo apt-get install docker-compose-plugin -y
 ```
 
-The server will start at **http://localhost:8000**
+### 2. Prepare the Environment
+Create a `.env` file for your production configuration.
+```bash
+cp .env.example .env
+```
+**Important:** You must change the `SECRET_KEY` in your `.env` file to a long, random string for security.
 
-### First Login
-1. Visit `http://localhost:8000` (redirects to `/auth`)
-2. Click **"New Player"** tab
-3. Enter a username (3+ characters)
-4. Click **"Create Account"**
-5. Start playing!
+### 3. Build and Run with Docker Compose
+Use the provided `docker-compose.yml` file to build and run the application in a detached container.
+```bash
+sudo docker-compose up --build -d
+```
+Your casino platform is now running on port 8000.
 
-### Admin Access
-1. Click **"🔐 Admin"** tab on login page
-2. Enter admin password (default: `admin123`)
-3. Access full admin panel at `/admin`
+### 4. Managing the Container
+- **View logs:** `sudo docker-compose logs -f`
+- **Stop the container:** `sudo docker-compose stop`
+- **Start the container:** `sudo docker-compose start`
+- **Stop and remove the container:** `sudo docker-compose down`
+
+---
+
+## ⚙️ Configuration
+
+The application's configuration is managed through a combination of environment variables and JSON files, allowing for both security and flexibility.
+
+-   **.env:** The primary method for configuring secure and environment-specific settings. It overrides any values in `config.json`. A template is provided in `.env.example`.
+-   **config.json:** Contains the base configuration for game settings, economy parameters, and admin credentials.
+-   **ODDS-CHANGER.json:** Allows for real-time modification of game odds without restarting the server.
+
+### Changing the Admin Password
+To set or change the admin password, modify the `admin_password_hash` in `config.json` with a plain-text password. The server will automatically hash it on the first startup.
+
+---
 
 ## 📁 Project Structure
-
 ```
 RNG-THING/
 ├── app/
 │   ├── main.py              # FastAPI application entry
 │   ├── config.py            # Configuration loader
-│   ├── core/
-│   │   ├── database.py      # SQLite database wrapper
-│   │   ├── economy.py       # Currency exchange system
-│   │   ├── rng.py           # Random number generation
-│   │   └── games/
-│   │       ├── slots.py     # Slot machine logic
-│   │       ├── blackjack.py # Blackjack game logic
-│   │       ├── roulette.py  # Roulette game logic
-│   │       ├── plinko.py    # Plinko game logic
-│   │       └── coinflip.py  # Coinflip game logic
-│   ├── routers/
-│   │   ├── pages.py         # HTML page routes
-│   │   ├── api.py           # Game API endpoints
-│   │   ├── auth.py          # Authentication routes
-│   │   └── admin.py         # Admin panel routes
+│   ├── core/                # Core logic (DB, economy, games)
+│   ├── routers/             # API and page routers
 │   ├── templates/           # Jinja2 HTML templates
-│   │   ├── base.html        # Base layout
-│   │   ├── index.html       # Home page
-│   │   ├── login.html       # Auth page
-│   │   ├── admin.html       # Admin panel
-│   │   ├── exchange.html    # Currency exchange
-│   │   └── [game].html      # Game pages
-│   └── static/
-│       ├── css/style.css    # Main stylesheet
-│       └── js/main.js       # Client JavaScript
+│   └── static/              # CSS/JS files
 ├── data/
 │   └── casino.db            # SQLite database (auto-created)
-├── config.json              # Server configuration
-├── requirements.txt         # Python dependencies
-└── README.md
+├── .env.example             # Environment variable template
+├── config.json              # Main configuration
+├── ODDS-CHANGER.json        # Dynamic game odds
+├── docker-compose.yml       # Docker Compose file
+├── Dockerfile               # Docker build file
+└── requirements.txt         # Python dependencies
 ```
 
-## ⚙️ Configuration
-
-Edit `config.json` to customize:
-
-```json
-{
-  "server": {
-    "host": "127.0.0.1",
-    "port": 8000,
-    "debug": true,
-    "name": "Gamble Limited"
-  },
-  "security": {
-    "admin_username": "admin",
-    "admin_password_hash": "YOUR_BCRYPT_HASH",
-    "secret_key": "CHANGE_THIS_IN_PRODUCTION"
-  },
-  "economy": {
-    "starting_cash": 1000.0,
-    "starting_credits": 500.0,
-    "base_exchange_rate": 10.0,
-    "fluctuation_range": 0.05
-  },
-  "games": {
-    "slots": { "min_bet": 10, "max_bet": 1000 },
-    "blackjack": { "min_bet": 20, "max_bet": 2000 },
-    "roulette": { "min_bet": 5, "max_bet": 5000 },
-    "plinko": { "min_bet": 1, "max_bet": 1000 },
-    "coinflip": { "min_bet": 1, "max_bet": 10000 }
-  }
-}
-```
-
-### Changing Admin Password
-You can set a plain text password in `config.json` - it will be automatically hashed on first server start:
-
-```json
-"admin_password_hash": "YourNewPassword123"
-```
-
-Or change it from the admin panel.
+---
 
 ## 🛠️ API Endpoints
 
 ### Authentication
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/auth` | Login/register page |
-| POST | `/auth/login` | User login |
-| POST | `/auth/register` | Create new user |
-| POST | `/auth/admin-login` | Admin login |
-| GET | `/logout` | Logout |
-
-### Games
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/games/slots/spin` | Spin slot machine |
-| POST | `/api/games/blackjack/deal` | Start blackjack hand |
-| POST | `/api/games/blackjack/action` | Hit/Stand/Double |
-| POST | `/api/games/roulette/spin` | Spin roulette wheel |
-| POST | `/api/games/plinko/drop` | Drop plinko ball |
-| POST | `/api/games/coinflip/flip` | Flip coin |
+| POST | `/auth/login` | Logs in a user. |
+| POST | `/auth/register` | Creates a new user account. |
+| POST | `/auth/admin-login` | Logs in an admin. |
+| GET | `/logout` | Logs out the current user. |
 
 ### Economy
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/economy/balance` | Get user balance |
-| GET | `/api/economy/rate` | Get exchange rate |
-| POST | `/api/economy/exchange` | Convert currency |
+| GET | `/api/economy/rate` | Gets the current currency exchange rate. |
+| GET | `/api/economy/balance` | Retrieves the user's balance. |
+| POST | `/api/economy/exchange` | Exchanges currency. |
+| GET | `/api/economy/transactions` | Gets the user's transaction history. |
+| POST | `/api/economy/daily` | Claims the daily bonus. |
+
+### Games
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/games/slots/spin` | Spins the slot machine. |
+| POST | `/api/games/blackjack/deal` | Deals a new hand of Blackjack. |
+| POST | `/api/games/blackjack/hit` | Hits in the current Blackjack game. |
+| POST | `/api/games/blackjack/stand`| Stands in the current Blackjack game. |
+| POST | `/api/games/roulette/spin` | Spins the roulette wheel. |
+| POST | `/api/games/plinko/drop` | Drops a ball in the Plinko machine. |
+| POST | `/api/games/coinflip/flip`| Flips a coin. |
 
 ### Admin
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/admin` | Admin panel |
-| POST | `/admin/api/reset-user` | Reset user balance |
-| POST | `/admin/api/delete-user` | Delete user |
-| POST | `/admin/api/grant-funds` | Grant cash/credits |
-| POST | `/admin/api/clear-all` | Clear all data |
-| POST | `/admin/api/change-password` | Change admin password |
+| POST | `/admin/api/reset-user` | Resets a user's balance. |
+| POST | `/admin/api/delete-user` | Deletes a user. |
+| POST | `/admin/api/grant-funds` | Grants funds to a user. |
+| POST | `/admin/api/clear-all` | Clears all data. |
+| POST | `/admin/api/change-password` | Changes the admin password. |
 
-## 🔒 Security Notes
+---
 
-- Admin passwords are hashed with **bcrypt**
-- Session cookies expire after 1 year (user) / 1 hour (admin)
-- No sensitive data stored in plaintext
-- Rate limiting recommended for production
+## 🚀 Deployment (Production)
 
-## 📝 Dependencies
+While Docker is the recommended method for deployment, you can also run the application directly on a server. For exposing your application to the internet, we strongly recommend using a reverse proxy like Nginx and placing it behind Cloudflare for security and performance.
 
-```
-fastapi>=0.100.0
-uvicorn>=0.23.0
-jinja2>=3.1.0
-python-multipart>=0.0.6
-pydantic>=2.0.0
-bcrypt>=4.0.0
-```
+### Non-Docker Deployment
+For running the application without Docker, you will need:
+- A process manager like `gunicorn` to handle the application workers.
+- A `systemd` service to ensure the application runs continuously and restarts on failure.
+- An Nginx reverse proxy to handle incoming traffic and SSL.
+
+### Cloudflare
+Using Cloudflare provides SSL, DDoS protection, and caching. You can connect your server to Cloudflare using:
+- **Cloudflare Tunnels (Recommended):** A secure way to expose your server without opening firewall ports.
+- **Traditional DNS with Nginx:** Pointing your domain to your server's IP and using Nginx to handle SSL.
+
+**For detailed, step-by-step instructions on setting up Nginx, systemd, and Cloudflare, please refer to the `CLOUDFLARE.md` file in this repository.**
+
+---
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open a Pull Request
+1.  Fork the repository
+2.  Create a feature branch (`git checkout -b feature/amazing`)
+3.  Commit changes (`git commit -m 'Add amazing feature'`)
+4.  Push to branch (`git push origin feature/amazing`)
+5.  Open a Pull Request
+
+---
 
 ## 📄 License
 
