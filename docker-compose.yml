@@ -1,8 +1,6 @@
 # RNG-THING Docker Compose Configuration
 # For development and production deployment
 
-version: '3.8'
-
 services:
   web:
     build: .
@@ -21,12 +19,11 @@ services:
       - DEBUG=false
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 5s
-
   # Optional: Nginx reverse proxy for production
   # Uncomment to use with Cloudflare or direct HTTPS
   # nginx:

@@ -219,14 +219,20 @@ def load_config() -> AppConfig:
     if "security" in data:
         current_pwd = data["security"].get("admin_password_hash", "")
         if current_pwd and not (current_pwd.startswith("$2") and len(current_pwd) == 60):
-            print("Configuration: Detected plain text admin password. Hashing and updating config.json...")
-            hashed_bytes = bcrypt.hashpw(current_pwd.encode('utf-8'), bcrypt.gensalt())
-            hashed_pwd = hashed_bytes.decode('utf-8')
-            data["security"]["admin_password_hash"] = hashed_pwd
-            
-            # Save updated config
-            with open(config_path, "w") as f:
-                json.dump(data, f, indent=4)
+            try:
+                print("Configuration: Detected plain text admin password. Hashing and updating config.json...")
+                hashed_bytes = bcrypt.hashpw(current_pwd.encode('utf-8'), bcrypt.gensalt())
+                hashed_pwd = hashed_bytes.decode('utf-8')
+                data["security"]["admin_password_hash"] = hashed_pwd
+                
+                # Save updated config
+                with open(config_path, "w") as f:
+                    json.dump(data, f, indent=4)
+            except (OSError, PermissionError):
+                print("Configuration: Warning - Could not update config.json (Read-Only filesystem). Running with hashed password in memory only.")
+                # We still update the in-memory data object so the app works for this session
+                hashed_bytes = bcrypt.hashpw(current_pwd.encode('utf-8'), bcrypt.gensalt())
+                data["security"]["admin_password_hash"] = hashed_bytes.decode('utf-8')
     
     return AppConfig(**data)
 
