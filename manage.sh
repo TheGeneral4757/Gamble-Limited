@@ -97,6 +97,11 @@ function check_for_updates {
         print_warning "Branch divergence detected. Cannot automatically update."
         UPDATE_AVAILABLE=false
     fi
+    
+    # Pause if no update or error
+    if [ "$UPDATE_AVAILABLE" = false ]; then
+        read -p "Press Enter to continue..."
+    fi
 }
 
 function handle_update {
@@ -132,6 +137,7 @@ function handle_update {
     
     echo "$NEW_VER" > "$VERSION_FILE"
     print_success "Version updated to $NEW_VER"
+    read -p "Press Enter to continue..."
 }
 
 # --- Configuration ---
@@ -184,6 +190,7 @@ function interact_config {
     
     ensure_permissions
     print_success "Configuration Saved."
+    read -p "Press Enter to continue..."
 }
 
 function ensure_permissions {
@@ -224,6 +231,7 @@ function stop_app {
 function view_logs {
     print_info "Showing logs (Ctrl+C to exit)..."
     docker compose logs -f
+    read -p "Logs closed. Press Enter..."
 }
 
 function view_status {
