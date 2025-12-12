@@ -116,7 +116,26 @@ function handle_update {
         print_warning "Update includes database changes. Migration logs will be shown."
     fi
 
-    git pull
+    # Auto-stash local changes to prevent conflict errors
+    STASHED=false
+    if [ -n "$(git status --porcelain)" ]; then
+        print_warning "Local changes detected. Stashing them to proceed..."
+        git stash push -m "Auto-stash by manage.sh"
+        STASHED=true
+    fi
+
+    if ! git pull; then
+        print_error "Git pull failed."
+        # Try to restore if we stashed
+        [ "$STASHED" = true ] && git stash pop
+        return
+    fi
+    
+    if [ "$STASHED" = true ]; then
+        print_info "Restoring local changes..."
+        # We accept that this might cause a conflict marker in the file
+        git stash pop > /dev/null 2>&1
+    fi
     
     # Version Bump
     VERSION_FILE="version.txt"
