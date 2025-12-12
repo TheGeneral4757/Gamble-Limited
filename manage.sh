@@ -174,11 +174,14 @@ function interact_config {
     read -p "Server Port [8000]: " PORT
     PORT=${PORT:-8000}
     
+    read -p "Cloudflare Tunnel Token (optional): " CF_TOKEN
+    
     read -p "Enable Nginx Proxy? (y/N): " NGINX_OPT
     
     # Write Files
     echo "SECRET_KEY=${SECRET_KEY}" > .env
     echo "SERVER_PORT=${PORT}" >> .env
+    [ -n "$CF_TOKEN" ] && echo "CF_TUNNEL_TOKEN=${CF_TOKEN}" >> .env
     
     # Generate config.json (simplified for brevity, ensuring key fields)
     jq -n --arg port "$PORT" --arg pass "$PASS" \
