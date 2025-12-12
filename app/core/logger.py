@@ -91,18 +91,23 @@ def setup_logger(
     
     # Optional file handler
     if log_to_file:
-        if log_file_path is None:
-            log_file_path = Path(__file__).parent.parent.parent / "data" / "app.log"
-        
-        log_file_path.parent.mkdir(exist_ok=True)
-        
-        file_handler = RotatingFileHandler(
-            log_file_path,
-            maxBytes=max_file_size,
-            backupCount=backup_count
-        )
-        file_handler.setFormatter(PlainFormatter())
-        logger.addHandler(file_handler)
+        try:
+            if log_file_path is None:
+                log_file_path = Path(__file__).parent.parent.parent / "data" / "app.log"
+            
+            log_file_path.parent.mkdir(exist_ok=True)
+            
+            file_handler = RotatingFileHandler(
+                log_file_path,
+                maxBytes=max_file_size,
+                backupCount=backup_count
+            )
+            file_handler.setFormatter(PlainFormatter())
+            logger.addHandler(file_handler)
+        except (OSError, PermissionError) as e:
+            # Fallback to console only if file access fails
+            sys.stderr.write(f"WARNING: Could not set up file logging: {e}\n")
+            sys.stderr.write("Continuing with console logging only.\n")
     
     # Prevent propagation to root logger
     logger.propagate = False

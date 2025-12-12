@@ -214,6 +214,18 @@ function configure_nginx {
     fi
 }
 
+function ensure_permissions {
+    print_info "Ensuring correct permissions for data directory..."
+    mkdir -p data
+    # Set ownership to 1000:1000 (appuser in container)
+    chown -R 1000:1000 data
+    
+    # Also ensure config.json is readable by everyone or specifically user 1000
+    if [ -f "config.json" ]; then
+        chmod 644 config.json
+    fi
+}
+
 function run_docker_compose {
     print_info "Building and starting Docker containers..."
     if ! docker compose up --build -d; then
@@ -249,6 +261,7 @@ main() {
     get_user_config
     generate_config_files
     configure_nginx
+    ensure_permissions
     run_docker_compose
     final_summary
 }
