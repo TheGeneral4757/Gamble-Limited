@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2>🏆 Leaderboard</h2>
+        <p>Top players by total winnings</p>
+    </div>
+
+    <div class="leaderboard-container">
+        <div id="leaderboard-loading" class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading leaderboard...</p>
+        </div>
+
+        <div id="leaderboard-empty" class="empty-state" style="display: none;">
+            <p>🏜️ No players yet. Be the first to make the leaderboard!</p>
+        </div>
+
+        <div id="leaderboard-content" style="display: none;">
+            <div class="podium" id="podium"></div>
+
+            <table id="leaderboard-table" class="data-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Total Won</th>
+                        <th>Total Wagered</th>
+                        <th>Biggest Win</th>
+                        <th>Games</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="action-buttons">
+        <a href="/" class="btn btn-secondary">← Back to Games</a>
+        <button onclick="loadLeaderboard()" class="btn btn-primary">🔄 Refresh</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadLeaderboard() {
+        const loading = document.getElementById('leaderboard-loading');
+        const empty = document.getElementById('leaderboard-empty');
+        const content = document.getElementById('leaderboard-content');
+        const podium = document.getElementById('podium');
+        const tbody = document.getElementById('leaderboard-body');
+
+        loading.style.display = 'block';
+        empty.style.display = 'none';
+        content.style.display = 'none';
+
+        try {
+            const response = await fetch('/api/leaderboard');
+            const data = await response.json();
+
+            loading.style.display = 'none';
+
+            if (!data.leaderboard || data.leaderboard.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+
+            // Build podium for top 3
+            podium.innerHTML = '';
+            const top3 = data.leaderboard.slice(0, 3);
+            const medals = ['🥇', '🥈', '🥉'];
+
+            top3.forEach((player, index) => {
+                const div = document.createElement('div');
+                div.className = `podium-place place-${index + 1}`;
+                div.innerHTML = `
+                <span class="medal">${medals[index]}</span>
+                <span class="podium-name">${player.username}</span>
+                <span class="podium-amount">${formatNumber(player.total_won)} CR</span>
+            `;
+                podium.appendChild(div);
+            });
+
+            // Build full table
+            tbody.innerHTML = '';
+            data.leaderboard.forEach((player, index) => {
+                const row = document.createElement('tr');
+                row.className = index < 3 ? `top-${index + 1}` : '';
+
+                row.innerHTML = `
+                <td class="rank">#${index + 1}</td>
+                <td class="player-name">${player.username}</td>
+                <td class="amount">${formatNumber(player.total_won)} CR</td>
+                <td>${formatNumber(player.total_wagered)} CR</td>
+                <td class="biggest">${formatNumber(player.biggest_win)} CR</td>
+                <td>${player.games_played}</td>
+            `;
+                tbody.appendChild(row);
+            });
+
+            content.style.display = 'block';
+        } catch (error) {
+            loading.innerHTML = '<p class="error">Failed to load leaderboard. Please try again.</p>';
+        }
+    }
+
+    function formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toFixed(0);
+    }
+
+    loadLeaderboard();
+</script>
+
+<style>
+    .page-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .page-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .leaderboard-container {
+        background: var(--card-bg, rgba(255, 255, 255, 0.05));
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .loading-state,
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        opacity: 0.7;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.2);
+        border-top: 3px solid var(--accent, #ffd700);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .podium {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .podium-place {
+        background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.05));
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        min-width: 150px;
+        transition: transform 0.2s;
+    }
+
+    .podium-place:hover {
+        transform: translateY(-5px);
+    }
+
+    .place-1 {
+        background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.1));
+        order: 2;
+    }
+
+    .place-2 {
+        order: 1;
+    }
+
+    .place-3 {
+        order: 3;
+    }
+
+    .medal {
+        font-size: 2.5rem;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .podium-name {
+        font-weight: 600;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+
+    .podium-amount {
+        color: #ffd700;
+        font-weight: 700;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .data-table th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        opacity: 0.7;
+    }
+
+    .top-1 {
+        background: rgba(255, 215, 0, 0.15);
+    }
+
+    .top-2 {
+        background: rgba(192, 192, 192, 0.1);
+    }
+
+    .top-3 {
+        background: rgba(205, 127, 50, 0.1);
+    }
+
+    .rank {
+        font-weight: 700;
+    }
+
+    .amount {
+        color: #4ade80;
+        font-weight: 600;
+    }
+
+    .biggest {
+        color: #ffd700;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #ffd700, #ffa500);
+        color: #000;
+    }
+
+    .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .error {
+        color: #f87171;
+    }
+</style>
+{% endblock %}

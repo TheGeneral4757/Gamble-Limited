@@ -176,7 +176,7 @@ class BlackjackGame:
             return {"error": "Game already completed", "game_id": game_id, "status": "error"}
         
         # Verify user owns this game
-        if user_id and game.get("user_id") and game["user_id"] != user_id:
+        if user_id and game.get("user_id") and str(game["user_id"]) != str(user_id):
             return {"error": "This is not your game", "game_id": game_id, "status": "error"}
         
         # Check if deck is empty (shouldn't happen in normal play)
@@ -223,7 +223,7 @@ class BlackjackGame:
             return {"error": "Game already completed", "game_id": game_id, "status": "error"}
         
         # Verify user owns this game
-        if user_id and game.get("user_id") and game["user_id"] != user_id:
+        if user_id and game.get("user_id") and str(game["user_id"]) != str(user_id):
             return {"error": "This is not your game", "game_id": game_id, "status": "error"}
         
         dealer_hand = game["dealer_hand"]

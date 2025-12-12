@@ -11,8 +11,14 @@ from datetime import datetime, timedelta
 import threading
 import hashlib
 
-# Database file location
-DB_PATH = Path("data/casino.db")
+from app.core.logger import get_logger
+from app.config import settings
+
+# Get logger for this module
+logger = get_logger("database")
+
+# Database path from config (resolved relative to project root)
+DB_PATH = settings.paths.get_db_path()
 
 class Database:
     """Thread-safe SQLite database wrapper with user authentication."""
@@ -21,6 +27,7 @@ class Database:
     
     def __init__(self):
         DB_PATH.parent.mkdir(exist_ok=True)
+        logger.info(f"Initializing database at {DB_PATH}")
         self._init_db()
     
     def _get_connection(self) -> sqlite3.Connection:
@@ -33,11 +40,12 @@ class Database:
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        # Users table
+        # Users table - with password auth and daily bonus tracking
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
+                password_hash TEXT,
                 is_admin INTEGER DEFAULT 0,
                 cash REAL DEFAULT 1000.0,
                 credits REAL DEFAULT 500.0,
@@ -48,6 +56,7 @@ class Database:
                 biggest_win REAL DEFAULT 0,
                 total_converted REAL DEFAULT 0,
                 last_conversion_time TEXT,
+                last_daily_claim TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 last_active TEXT DEFAULT CURRENT_TIMESTAMP
             )
@@ -101,26 +110,90 @@ class Database:
             cursor.execute("INSERT INTO admin_settings (key, value) VALUES ('admin_password', ?)", (default_hash,))
         
         conn.commit()
+        
+        # Run migrations for schema upgrades
+        self._migrate_schema()
+    
+    def _migrate_schema(self):
+        """Handle schema migrations for existing databases."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        # Check and add missing columns
+        cursor.execute("PRAGMA table_info(users)")
+        columns = {row[1] for row in cursor.fetchall()}
+        
+        if 'password_hash' not in columns:
+            logger.info("Migrating: Adding password_hash column")
+            cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+        
+        if 'last_daily_claim' not in columns:
+            logger.info("Migrating: Adding last_daily_claim column")
+            cursor.execute("ALTER TABLE users ADD COLUMN last_daily_claim TEXT")
+        
+        if 'last_daily_cash' not in columns:
+            logger.info("Migrating: Adding last_daily_cash column")
+            cursor.execute("ALTER TABLE users ADD COLUMN last_daily_cash TEXT")
+        
+        if 'banned_until' not in columns:
+            logger.info("Migrating: Adding banned_until column")
+            cursor.execute("ALTER TABLE users ADD COLUMN banned_until TEXT")
+        
+        if 'ban_reason' not in columns:
+            logger.info("Migrating: Adding ban_reason column")
+            cursor.execute("ALTER TABLE users ADD COLUMN ban_reason TEXT")
+        
+        if 'user_type' not in columns:
+            logger.info("Migrating: Adding user_type column")
+            cursor.execute("ALTER TABLE users ADD COLUMN user_type TEXT DEFAULT 'user'")
+        
+        # Ensure THE HOUSE user exists
+        self._ensure_house_user(cursor)
+        
+        conn.commit()
+    
+    def _ensure_house_user(self, cursor):
+        """Ensure THE HOUSE special user exists."""
+        cursor.execute("SELECT id FROM users WHERE username = 'THE_HOUSE'")
+        if not cursor.fetchone():
+            logger.info("Creating THE HOUSE user")
+            cursor.execute("""
+                INSERT INTO users (username, password_hash, cash, credits, user_type, is_admin)
+                VALUES ('THE_HOUSE', NULL, 0, 0, 'house', 1)
+            """)
     
     # ==================== User Authentication ====================
     
-    def create_user(self, username: str) -> Dict:
-        """Create a new user with username."""
+    def create_user(self, username: str, password: str = None) -> Dict:
+        """Create a new user with username and optional password."""
+        import bcrypt
+        
         conn = self._get_connection()
         cursor = conn.cursor()
+        
+        # Sanitize and validate username
+        username = self._sanitize_username(username)
+        if not username:
+            return {"success": False, "error": "Invalid username"}
         
         # Check if username exists
         cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
         if cursor.fetchone():
             return {"success": False, "error": "Username already taken"}
         
-        from app.config import settings
+        # Hash password if provided
+        password_hash = None
+        if password:
+            password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
         cursor.execute("""
-            INSERT INTO users (username, cash, credits, last_active)
-            VALUES (?, ?, ?, ?)
-        """, (username, settings.economy.starting_cash, settings.economy.starting_credits, 
+            INSERT INTO users (username, password_hash, cash, credits, last_active)
+            VALUES (?, ?, ?, ?, ?)
+        """, (username, password_hash, settings.economy.starting_cash, settings.economy.starting_credits, 
               datetime.now().isoformat()))
         conn.commit()
+        
+        logger.info(f"Created new user: {username}")
         
         return {
             "success": True,
@@ -130,8 +203,21 @@ class Database:
             "credits": settings.economy.starting_credits
         }
     
-    def login_user(self, username: str) -> Optional[Dict]:
-        """Login existing user by username."""
+    def _sanitize_username(self, username: str) -> str:
+        """Sanitize username - alphanumeric only, 3-20 chars."""
+        import re
+        if not username:
+            return ""
+        # Strip whitespace and limit to alphanumeric + underscore
+        username = username.strip()
+        if not re.match(r'^[a-zA-Z0-9_]{3,20}$', username):
+            return ""
+        return username
+    
+    def login_user(self, username: str, password: str = None) -> Optional[Dict]:
+        """Login existing user by username and password."""
+        import bcrypt
+        
         conn = self._get_connection()
         cursor = conn.cursor()
         
@@ -141,12 +227,34 @@ class Database:
         if not row:
             return None
         
+        user = dict(row)
+        
+        # Verify password if user has one set
+        if user.get('password_hash'):
+            if not password:
+                return None  # Password required but not provided
+            try:
+                if not bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
+                    return None  # Wrong password
+            except Exception:
+                return None
+        
+        # Check if user is banned
+        if user.get('banned_until'):
+            try:
+                ban_time = datetime.fromisoformat(user['banned_until'])
+                if datetime.now() < ban_time:
+                    # Still banned
+                    return {"banned": True, "banned_until": user['banned_until'], "ban_reason": user.get('ban_reason', 'No reason specified')}
+            except:
+                pass
+        
         # Update last active
         cursor.execute("UPDATE users SET last_active = ? WHERE id = ?",
-                      (datetime.now().isoformat(), row["id"]))
+                      (datetime.now().isoformat(), user["id"]))
         conn.commit()
         
-        return dict(row)
+        return user
     
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
         """Get user by ID."""
@@ -243,6 +351,179 @@ class Database:
         conn.commit()
         
         return self.get_balance(user_id)
+    
+    # ==================== Daily Bonus ====================
+    
+    def claim_daily_bonus(self, user_id: int) -> Dict:
+        """
+        Claim daily bonus credits. Returns success/error with details.
+        Cooldown and amount are configurable in config.json.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT last_daily_claim, credits FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return {"success": False, "error": "User not found"}
+        
+        last_claim = row["last_daily_claim"]
+        cooldown_hours = settings.economy.daily_bonus_cooldown_hours
+        bonus_amount = settings.economy.daily_bonus_amount
+        
+        # Check cooldown
+        if last_claim:
+            try:
+                last_time = datetime.fromisoformat(last_claim)
+                time_since = (datetime.now() - last_time).total_seconds()
+                cooldown_seconds = cooldown_hours * 3600
+                
+                if time_since < cooldown_seconds:
+                    remaining = cooldown_seconds - time_since
+                    hours = int(remaining // 3600)
+                    minutes = int((remaining % 3600) // 60)
+                    return {
+                        "success": False, 
+                        "error": f"Daily bonus already claimed. Come back in {hours}h {minutes}m",
+                        "remaining_seconds": int(remaining)
+                    }
+            except Exception as e:
+                logger.warning(f"Error parsing last_daily_claim: {e}")
+        
+        # Grant bonus
+        new_credits = row["credits"] + bonus_amount
+        now = datetime.now().isoformat()
+        
+        cursor.execute("""
+            UPDATE users SET credits = ?, last_daily_claim = ?, last_active = ?
+            WHERE id = ?
+        """, (new_credits, now, now, user_id))
+        conn.commit()
+        
+        # Log transaction
+        self.log_transaction(user_id, "daily_bonus", bonus_amount, new_credits, 
+                            currency="credits", details="Daily bonus claimed")
+        
+        logger.info(f"User {user_id} claimed daily bonus: {bonus_amount} credits")
+        
+        return {
+            "success": True,
+            "amount": bonus_amount,
+            "new_balance": new_credits,
+            "next_claim_hours": cooldown_hours
+        }
+    
+    def claim_daily_cash(self, user_id: int) -> Dict:
+        """
+        Claim daily cash bonus. Separate from credits daily bonus.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT last_daily_cash, cash FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return {"success": False, "error": "User not found"}
+        
+        last_claim = row["last_daily_cash"]
+        cooldown_hours = settings.economy.daily_cash_cooldown_hours
+        bonus_amount = settings.economy.daily_cash_amount
+        
+        # Check cooldown
+        if last_claim:
+            try:
+                last_time = datetime.fromisoformat(last_claim)
+                time_since = (datetime.now() - last_time).total_seconds()
+                cooldown_seconds = cooldown_hours * 3600
+                
+                if time_since < cooldown_seconds:
+                    remaining = cooldown_seconds - time_since
+                    hours = int(remaining // 3600)
+                    minutes = int((remaining % 3600) // 60)
+                    return {
+                        "success": False, 
+                        "error": f"Daily cash already claimed. Come back in {hours}h {minutes}m",
+                        "remaining_seconds": int(remaining)
+                    }
+            except Exception as e:
+                logger.warning(f"Error parsing last_daily_cash: {e}")
+        
+        # Grant cash bonus
+        new_cash = row["cash"] + bonus_amount
+        now = datetime.now().isoformat()
+        
+        cursor.execute("""
+            UPDATE users SET cash = ?, last_daily_cash = ?, last_active = ?
+            WHERE id = ?
+        """, (new_cash, now, now, user_id))
+        conn.commit()
+        
+        # Log transaction
+        self.log_transaction(user_id, "daily_cash", bonus_amount, new_cash, 
+                            currency="cash", details="Daily cash bonus claimed")
+        
+        logger.info(f"User {user_id} claimed daily cash: {bonus_amount}")
+        
+        return {
+            "success": True,
+            "amount": bonus_amount,
+            "new_balance": new_cash,
+            "currency": "cash",
+            "next_claim_hours": cooldown_hours
+        }
+    
+    # ==================== House Balance ====================
+    
+    def add_house_cut(self, bet_amount: float, game: str = None) -> float:
+        """
+        Add house cut from a bet to THE HOUSE user's balance.
+        Returns the cut amount.
+        """
+        cut_percent = settings.economy.house_cut_percent
+        cut_amount = bet_amount * (cut_percent / 100)
+        
+        if cut_amount <= 0:
+            return 0
+        
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE users SET credits = credits + ? WHERE username = 'THE_HOUSE'
+        """, (cut_amount,))
+        conn.commit()
+        
+        # Log transaction for house
+        cursor.execute("SELECT id, credits FROM users WHERE username = 'THE_HOUSE'")
+        house = cursor.fetchone()
+        if house:
+            self.log_transaction(house["id"], "house_cut", cut_amount, house["credits"],
+                               game=game, details=f"{cut_percent}% cut from bet")
+        
+        return cut_amount
+    
+    def get_house_balance(self) -> Dict:
+        """Get THE HOUSE balance."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT cash, credits FROM users WHERE username = 'THE_HOUSE'")
+        row = cursor.fetchone()
+        
+        if row:
+            return {"cash": row["cash"], "credits": row["credits"]}
+        return {"cash": 0, "credits": 0}
+    
+    def get_house_user(self) -> Optional[Dict]:
+        """Get THE HOUSE user data."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM users WHERE username = 'THE_HOUSE'")
+        row = cursor.fetchone()
+        return dict(row) if row else None
     
     # ==================== Conversion Tracking ====================
     
@@ -387,15 +668,33 @@ class Database:
         return {"success": True, "user_id": user_id}
     
     def delete_user(self, user_id: int) -> Dict:
-        """Delete a user completely."""
+        """Delete a user completely - DEPRECATED, use ban_user instead."""
+        return self.ban_user(user_id, hours=8760, reason="Account deleted")  # 1 year ban
+    
+    def ban_user(self, user_id: int, hours: int = 24, reason: str = "Banned by admin") -> Dict:
+        """Ban a user for a specified duration."""
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        cursor.execute("DELETE FROM transactions WHERE user_id = ?", (user_id,))
-        cursor.execute("DELETE FROM user_game_stats WHERE user_id = ?", (user_id,))
-        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        banned_until = (datetime.now() + timedelta(hours=hours)).isoformat()
+        
+        cursor.execute("""
+            UPDATE users SET banned_until = ?, ban_reason = ? WHERE id = ?
+        """, (banned_until, reason, user_id))
         conn.commit()
         
+        logger.info(f"User {user_id} banned until {banned_until}: {reason}")
+        return {"success": True, "banned_until": banned_until, "reason": reason}
+    
+    def unban_user(self, user_id: int) -> Dict:
+        """Remove ban from a user."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("UPDATE users SET banned_until = NULL, ban_reason = NULL WHERE id = ?", (user_id,))
+        conn.commit()
+        
+        logger.info(f"User {user_id} unbanned")
         return {"success": True}
     
     def get_stats(self) -> Dict:

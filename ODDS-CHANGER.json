@@ -1,0 +1,106 @@
+{
+    "_comment": "Game odds configuration - editable in real-time from admin panel",
+    "_instructions": {
+        "plinko": {
+            "center_bias": "Range 0.0-1.0. Lower = more edge wins, Higher = more center (losses). 0.5 = fair",
+            "multipliers": "Array of multipliers for each slot. Middle slots hit most often."
+        },
+        "slots": {
+            "symbol_weights": "Higher weight = more common. Total should be ~100",
+            "payouts_3x": "Multiplier for 3 matching symbols",
+            "payouts_2x": "Multiplier for 2 matching symbols"
+        },
+        "coinflip": {
+            "player_odds": "0.5 = fair, higher = better for player"
+        },
+        "roulette": {
+            "house_edge_reduction": "0.0 = normal house edge, 1.0 = no house edge"
+        }
+    },
+    "plinko": {
+        "center_bias": 0.55,
+        "multipliers": {
+            "16": [
+                5,
+                3,
+                2,
+                1,
+                0.5,
+                0.3,
+                0.2,
+                0.3,
+                0.3,
+                0.2,
+                0.3,
+                0.5,
+                1,
+                2,
+                3,
+                5
+            ],
+            "12": [
+                4,
+                2,
+                1,
+                0.5,
+                0.3,
+                0.2,
+                0.2,
+                0.3,
+                0.5,
+                1,
+                2,
+                4
+            ],
+            "8": [
+                3,
+                1.5,
+                0.5,
+                0.3,
+                0.3,
+                0.5,
+                1.5,
+                3
+            ]
+        }
+    },
+    "slots": {
+        "symbol_weights": {
+            "🍒": 25,
+            "🍋": 22,
+            "🍊": 18,
+            "🍇": 15,
+            "🔔": 10,
+            "💎": 7,
+            "7️⃣": 3
+        },
+        "payouts_3x": {
+            "🍒": 5,
+            "🍋": 8,
+            "🍊": 12,
+            "🍇": 18,
+            "🔔": 30,
+            "💎": 60,
+            "7️⃣": 100
+        },
+        "payouts_2x": {
+            "🍒": 1.5,
+            "🍋": 2,
+            "🍊": 3,
+            "🍇": 4,
+            "🔔": 6,
+            "💎": 12,
+            "7️⃣": 25
+        }
+    },
+    "coinflip": {
+        "player_odds": 0.50,
+        "payout_multiplier": 2.0
+    },
+    "roulette": {
+        "house_edge_enabled": true,
+        "single_number_payout": 35,
+        "color_payout": 2,
+        "dozen_payout": 3
+    }
+}

@@ -6,6 +6,29 @@
     <p>Experience true randomness in a premium environment.</p>
 </section>
 
+<!-- Daily Rewards Section -->
+<section class="daily-rewards">
+    <h3>🎁 Daily Rewards</h3>
+    <div class="rewards-grid">
+        <div class="reward-card" id="daily-credits-card">
+            <div class="reward-icon">💎</div>
+            <div class="reward-info">
+                <strong>Daily Credits</strong>
+                <span>+{{ daily_bonus_credits }} CR</span>
+            </div>
+            <button class="claim-btn" onclick="claimDailyReward('credits')">Claim</button>
+        </div>
+        <div class="reward-card" id="daily-cash-card">
+            <div class="reward-icon">💵</div>
+            <div class="reward-info">
+                <strong>Daily Cash</strong>
+                <span>+${{ daily_bonus_cash }}</span>
+            </div>
+            <button class="claim-btn" onclick="claimDailyReward('cash')">Claim</button>
+        </div>
+    </div>
+</section>
+
 <section class="games-grid">
     {% for game_name, game_config in games.items() %}
     {% if game_config.enabled %}
@@ -45,4 +68,139 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function claimDailyReward(type) {
+        const endpoint = type === 'credits' ? '/api/economy/daily' : '/api/economy/daily-cash';
+        const cardId = type === 'credits' ? 'daily-credits-card' : 'daily-cash-card';
+        const card = document.getElementById(cardId);
+        const btn = card.querySelector('.claim-btn');
+
+        btn.disabled = true;
+        btn.textContent = 'Claiming...';
+
+        try {
+            const response = await fetch(endpoint, { method: 'POST' });
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                btn.textContent = '✓ Claimed!';
+                btn.classList.add('claimed');
+                card.classList.add('claimed');
+
+                // Update balance display
+                fetch('/api/economy/balance')
+                    .then(r => r.json())
+                    .then(bal => {
+                        if (document.getElementById('cash-balance') && !bal.is_admin) {
+                            document.getElementById('cash-balance').textContent = bal.cash.toFixed(2);
+                            document.getElementById('credits-balance').textContent = bal.credits.toFixed(2);
+                        }
+                    });
+
+                showToast(`Claimed ${type === 'credits' ? result.amount + ' credits' : '$' + result.amount}!`, 'success');
+            } else {
+                btn.textContent = 'Claim';
+                btn.disabled = false;
+                showToast(result.detail || result.error || 'Failed to claim', 'error');
+            }
+        } catch (e) {
+            btn.textContent = 'Claim';
+            btn.disabled = false;
+            showToast('Network error', 'error');
+        }
+    }
+
+    function showToast(msg, type) {
+        const toast = document.getElementById('big-win-toast');
+        const icon = toast.querySelector('.big-win-icon');
+        const text = toast.querySelector('.big-win-text');
+        icon.textContent = type === 'success' ? '🎉' : '❌';
+        text.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 4000);
+    }
+</script>
+
+<style>
+    .daily-rewards {
+        margin: 2rem auto;
+        max-width: 800px;
+        text-align: center;
+    }
+
+    .daily-rewards h3 {
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+    }
+
+    .rewards-grid {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .reward-card {
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 160, 204, 0.1));
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .reward-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .reward-card.claimed {
+        opacity: 0.6;
+        background: linear-gradient(135deg, rgba(74, 222, 128, 0.1), rgba(34, 197, 94, 0.1));
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    .reward-icon {
+        font-size: 2rem;
+    }
+
+    .reward-info {
+        display: flex;
+        flex-direction: column;
+        text-align: left;
+    }
+
+    .reward-info span {
+        opacity: 0.7;
+        font-size: 0.9rem;
+    }
+
+    .claim-btn {
+        padding: 0.5rem 1.25rem;
+        background: linear-gradient(135deg, #00d4ff, #00a0cc);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .claim-btn:hover:not(:disabled) {
+        transform: scale(1.05);
+    }
+
+    .claim-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .claim-btn.claimed {
+        background: linear-gradient(135deg, #4ade80, #22c55e);
+    }
+</style>
 {% endblock %}

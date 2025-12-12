@@ -8,13 +8,20 @@
     "security": {
         "admin_username": "admin",
         "admin_password_hash": "$2b$12$sbAYQJ8zIrBNeEqpCyWR2OowiV0RXH.qmfq5k9xeYzE4X8O26tOV6",
-        "secret_key": "CHANGE_THIS_IN_PRODUCTION_PLEASE"
+        "secret_key": "CHANGE_THIS_IN_PRODUCTION_PLEASE",
+        "admin_login_path": "/admin-portal",
+        "house_login_path": "/the-house"
     },
     "economy": {
         "starting_cash": 1000.0,
         "starting_credits": 500.0,
         "base_exchange_rate": 10.0,
-        "fluctuation_range": 0.05
+        "fluctuation_range": 0.05,
+        "daily_bonus_amount": 100.0,
+        "daily_bonus_cooldown_hours": 24,
+        "daily_cash_amount": 50.0,
+        "daily_cash_cooldown_hours": 24,
+        "house_cut_percent": 5.0
     },
     "games": {
         "slots": {
@@ -34,7 +41,7 @@
             "max_bet": 5000
         },
         "plinko": {
-            "enabled": true,
+            "enabled": false,
             "min_bet": 1,
             "max_bet": 1000
         },
@@ -43,5 +50,23 @@
             "min_bet": 1,
             "max_bet": 10000
         }
+    },
+    "gamble_friday": {
+        "enabled": true,
+        "start_hour": 6,
+        "end_hour": 18,
+        "timezone": "America/Chicago",
+        "winnings_multiplier": 1.5,
+        "win_rate_reduction": 0.05,
+        "max_bet_multiplier": 3
+    },
+    "rate_limit": {
+        "enabled": true,
+        "game_requests": "30/minute",
+        "api_requests": "60/minute"
+    },
+    "logging": {
+        "level": "INFO",
+        "log_to_file": true
     }
 }

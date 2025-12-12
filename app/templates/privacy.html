@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="legal-page">
+    <div class="legal-header">
+        <h1>🔒 Privacy Policy</h1>
+        <p class="last-updated">Last updated: December 2024</p>
+    </div>
+
+    <div class="legal-content">
+        <section class="legal-section">
+            <h2>Summary</h2>
+            <p>
+                {{ app_name }} is committed to protecting your privacy. We collect minimal data
+                necessary to operate the service: username, hashed password, and gameplay statistics.
+                We do not sell or share your personal information with third parties. Your data is
+                stored securely and used only to provide and improve the gaming experience. You may
+                request deletion of your account and associated data at any time by contacting support.
+            </p>
+        </section>
+
+        <section class="legal-section placeholder">
+            <h2>Full Policy</h2>
+            <p class="placeholder-text">
+                <em>📝 Detailed privacy policy will be added here before official release.
+                    This will include sections on:</em>
+            </p>
+            <ul>
+                <li>Information we collect</li>
+                <li>How we use your information</li>
+                <li>Data retention and security</li>
+                <li>Cookies and tracking</li>
+                <li>Your rights and choices</li>
+                <li>Contact information</li>
+            </ul>
+        </section>
+    </div>
+
+    <div class="legal-footer">
+        <a href="/" class="btn btn-secondary">← Back to Games</a>
+        <a href="/tos" class="btn btn-link">Terms of Service →</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .legal-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .legal-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .legal-header h1 {
+        margin-bottom: 0.5rem;
+    }
+
+    .last-updated {
+        opacity: 0.6;
+        font-size: 0.9rem;
+    }
+
+    .legal-content {
+        background: var(--card-bg, rgba(255, 255, 255, 0.05));
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .legal-section {
+        margin-bottom: 2rem;
+    }
+
+    .legal-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .legal-section h2 {
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
+    }
+
+    .legal-section p {
+        line-height: 1.7;
+        opacity: 0.9;
+    }
+
+    .legal-section ul {
+        margin-top: 1rem;
+        padding-left: 1.5rem;
+        opacity: 0.8;
+    }
+
+    .legal-section li {
+        margin-bottom: 0.5rem;
+    }
+
+    .placeholder {
+        border-left: 3px solid rgba(0, 212, 255, 0.5);
+        padding-left: 1rem;
+        opacity: 0.8;
+    }
+
+    .placeholder-text {
+        color: #00d4ff;
+    }
+
+    .legal-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+
+    .btn-link {
+        color: var(--accent, #00d4ff);
+        background: none;
+    }
+
+    .btn:hover {
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}

@@ -11,20 +11,30 @@
         <div class="auth-tabs">
             <button class="auth-tab active" onclick="showTab('login')">Login</button>
             <button class="auth-tab" onclick="showTab('register')">New Player</button>
-            <button class="auth-tab admin-tab" onclick="showTab('admin')">🔐 Admin</button>
+            {% if is_admin %}
+            <button class="auth-tab admin-tab active" onclick="showTab('admin')">🔐 Admin</button>
+            {% endif %}
+            {% if is_house %}
+            <button class="auth-tab house-tab active" onclick="showTab('house')">🏛️ House</button>
+            {% endif %}
         </div>
 
         <!-- Login Tab -->
-        <div id="login-tab" class="auth-form active">
+        <div id="login-tab" class="auth-form {% if not is_admin and not is_house %}active{% endif %}">
             <form action="/auth/login" method="POST">
                 <div class="form-group">
                     <label for="login-username">Username</label>
                     <input type="text" id="login-username" name="username" required placeholder="Enter your username"
                         autocomplete="username">
                 </div>
+                <div class="form-group">
+                    <label for="login-password">Password <span class="optional">(if set)</span></label>
+                    <input type="password" id="login-password" name="password" placeholder="Enter your password"
+                        autocomplete="current-password">
+                </div>
                 <button type="submit" class="auth-btn">🎮 Enter Casino</button>
             </form>
-            {% if error and not is_admin %}
+            {% if error and not is_admin and not is_house %}
             <div class="auth-error">{{ error }}</div>
             {% endif %}
         </div>
@@ -38,7 +48,24 @@
                         minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+"
                         title="Letters, numbers, and underscores only">
                 </div>
+                <div class="form-group">
+                    <label for="reg-password">Password <span class="optional">(optional but recommended)</span></label>
+                    <input type="password" id="reg-password" name="password" placeholder="Create a password"
+                        minlength="6" autocomplete="new-password">
+                </div>
+                <div class="form-group" id="confirm-group" style="display: none;">
+                    <label for="reg-password-confirm">Confirm Password</label>
+                    <input type="password" id="reg-password-confirm" name="password_confirm"
+                        placeholder="Confirm your password" autocomplete="new-password">
+                </div>
                 <p class="form-hint">You'll start with $1000 cash and 500 credits!</p>
+                <div class="form-group tos-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="accept_tos" id="accept-tos" required>
+                        <span>I agree to the <a href="/tos" target="_blank">Terms of Service</a> and <a href="/privacy"
+                                target="_blank">Privacy Policy</a></span>
+                    </label>
+                </div>
                 <button type="submit" class="auth-btn register">🎉 Create Account</button>
             </form>
             {% if reg_error %}
@@ -46,8 +73,8 @@
             {% endif %}
         </div>
 
-        <!-- Admin Tab -->
-        <div id="admin-tab" class="auth-form">
+        <!-- Admin Tab (hidden unless accessed via special route) -->
+        <div id="admin-tab" class="auth-form {% if is_admin %}active{% endif %}">
             <form action="/auth/admin-login" method="POST">
                 <div class="form-group">
                     <label for="admin-password">Admin Password</label>
@@ -61,6 +88,25 @@
             {% endif %}
             <p class="admin-hint">Admin accounts have unlimited funds</p>
         </div>
+
+        <!-- House Tab (hidden unless accessed via /the-house) -->
+        <div id="house-tab" class="auth-form {% if is_house %}active{% endif %}">
+            <form action="/auth/house-login" method="POST">
+                <div class="form-group">
+                    <label for="house-password">House Password</label>
+                    <input type="password" id="house-password" name="password" required placeholder="Enter password">
+                </div>
+                <button type="submit" class="auth-btn house">🏛️ THE HOUSE Login</button>
+            </form>
+            {% if is_house and error %}
+            <div class="auth-error">{{ error }}</div>
+            {% endif %}
+            <p class="admin-hint">THE HOUSE earns from player bets (no infinite funds)</p>
+        </div>
+    </div>
+
+    <div class="legal-links">
+        <a href="/tos">Terms of Service</a> | <a href="/privacy">Privacy Policy</a>
     </div>
 </div>
 {% endblock %}
@@ -77,9 +123,218 @@
         event.target.classList.add('active');
     }
 
+    // Show password confirm when password is entered
+    const passwordInput = document.getElementById('reg-password');
+    const confirmGroup = document.getElementById('confirm-group');
+
+    passwordInput.addEventListener('input', function () {
+        if (this.value.length > 0) {
+            confirmGroup.style.display = 'block';
+        } else {
+            confirmGroup.style.display = 'none';
+        }
+    });
+
     // Check URL for registration success
     if (window.location.search.includes('registered=1')) {
         showTab('login');
     }
+
+    // Show admin/house tab if flags set
+    {% if is_admin %}
+    showTab('admin');
+    {% endif %}
+    {% if is_house %}
+    showTab('house');
+    {% endif %}
 </script>
+
+<style>
+    .auth-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 70vh;
+        padding: 2rem;
+    }
+
+    .auth-card {
+        background: var(--card-bg, rgba(255, 255, 255, 0.05));
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 400px;
+        width: 100%;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .auth-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .auth-tab {
+        flex: 1;
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: none;
+        border-radius: 8px;
+        color: inherit;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .auth-tab.active {
+        background: linear-gradient(135deg, #00d4ff, #00a0cc);
+    }
+
+    .auth-tab.admin-tab {
+        flex: 0.5;
+        font-size: 0.85rem;
+    }
+
+    .auth-form {
+        display: none;
+    }
+
+    .auth-form.active {
+        display: block;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 0.75rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: inherit;
+        font-size: 1rem;
+    }
+
+    .form-group input:focus {
+        border-color: #00d4ff;
+        outline: none;
+    }
+
+    .optional {
+        opacity: 0.6;
+        font-weight: normal;
+        font-size: 0.85rem;
+    }
+
+    .form-hint {
+        font-size: 0.85rem;
+        opacity: 0.7;
+        margin-bottom: 1rem;
+    }
+
+    .auth-btn {
+        width: 100%;
+        padding: 0.875rem;
+        background: linear-gradient(135deg, #00d4ff, #00a0cc);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .auth-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+    }
+
+    .auth-btn.register {
+        background: linear-gradient(135deg, #4ade80, #22c55e);
+    }
+
+    .auth-btn.admin {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
+    .auth-btn.house {
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    }
+
+    .house-tab {
+        flex: 0.5;
+        font-size: 0.85rem;
+    }
+
+    .auth-error {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: rgba(239, 68, 68, 0.2);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        color: #f87171;
+        text-align: center;
+    }
+
+    .admin-hint {
+        margin-top: 1rem;
+        font-size: 0.8rem;
+        opacity: 0.5;
+        text-align: center;
+    }
+
+    .legal-links {
+        margin-top: 1.5rem;
+        font-size: 0.85rem;
+        opacity: 0.6;
+    }
+
+    .legal-links a {
+        color: inherit;
+    }
+
+    .tos-group {
+        margin-top: 1rem;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        cursor: pointer;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+        margin-top: 3px;
+        accent-color: #00d4ff;
+        transform: scale(1.2);
+    }
+
+    .checkbox-label span {
+        opacity: 0.9;
+    }
+
+    .checkbox-label a {
+        color: #00d4ff;
+        text-decoration: underline;
+    }
+
+    .checkbox-label a:hover {
+        color: #00a0cc;
+    }
+</style>
 {% endblock %}

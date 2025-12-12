@@ -1,26 +1,43 @@
 from app.core.rng import rng
+from app.core.odds import get_game_odds
 from typing import Dict, List
 
 class PlinkoGame:
     """
-    Plinko board simulation with realistic house edge.
+    Plinko board simulation with configurable odds.
     Ball drops through rows of pegs, bouncing left or right.
     Final position determines multiplier.
     
-    Odds are weighted to favor lower multipliers (60-65% of drops result in loss).
+    Odds are loaded from ODDS-CHANGER.json for real-time adjustments.
     """
     
-    # Multipliers HEAVILY nerfed - house edge ~15-20%
-    # Most common outcomes are 0.1x-0.3x (big losses)
-    # Edge slots are rare and only 3-5x max
-    MULTIPLIERS = {
-        16: [5, 2, 1, 0.5, 0.3, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.3, 0.5, 1, 2, 5],
-        12: [3, 1.5, 0.5, 0.2, 0.1, 0.1, 0.1, 0.1, 0.2, 0.5, 1.5, 3, 0],
-        8:  [2, 0.5, 0.2, 0.1, 0.1, 0.2, 0.5, 2, 0],
+    # Default multipliers (used if config fails)
+    DEFAULT_MULTIPLIERS = {
+        16: [8, 4, 2, 1.5, 1, 0.5, 0.3, 0.5, 0.5, 0.3, 0.5, 1, 1.5, 2, 4, 8],
+        12: [5, 2.5, 1.5, 0.7, 0.3, 0.2, 0.2, 0.3, 0.7, 1.5, 2.5, 5],
+        8:  [3, 1.5, 0.5, 0.3, 0.3, 0.5, 1.5, 3],
     }
     
-    # Stronger bias towards center (where multipliers are lowest)
-    CENTER_BIAS = 0.45  # Strong bias towards center for house edge
+    DEFAULT_CENTER_BIAS = 0.40
+    
+    def _get_odds(self) -> tuple:
+        """Get current odds from config file."""
+        config = get_game_odds("plinko")
+        
+        center_bias = config.get("center_bias", self.DEFAULT_CENTER_BIAS)
+        multipliers_config = config.get("multipliers", {})
+        
+        # Convert string keys to int
+        multipliers = {}
+        for rows, mults in multipliers_config.items():
+            multipliers[int(rows)] = mults
+        
+        # Merge with defaults
+        for rows, defaults in self.DEFAULT_MULTIPLIERS.items():
+            if rows not in multipliers:
+                multipliers[rows] = defaults
+        
+        return center_bias, multipliers
     
     def drop(self, bet_amount: float, rows: int = 16, risk: str = "medium") -> Dict:
         """
@@ -34,23 +51,23 @@ class PlinkoGame:
         Returns:
             Dict with path, final slot, multiplier, and payout
         """
+        # Load current odds
+        center_bias, all_multipliers = self._get_odds()
+        
         # Validate and normalize rows
         if rows not in [8, 12, 16]:
             rows = 16
         
         # Get multiplier set
-        multipliers = self.MULTIPLIERS.get(rows, self.MULTIPLIERS[16])
-        if multipliers[-1] == 0:  # Remove padding zeros
-            multipliers = multipliers[:-1]
+        multipliers = all_multipliers.get(rows, self.DEFAULT_MULTIPLIERS[16])
         
-        # Simulate ball path with slight center bias
+        # Simulate ball path with configurable center bias
         position = 0
         path = []
         
         for row in range(rows):
-            # Use weighted random - slightly more likely to go towards center
-            # The further from center, the more likely to go back
-            bias = self.CENTER_BIAS
+            # Use weighted random - adjust based on position
+            bias = center_bias
             
             # Add dynamic bias based on position (pull towards center)
             if position > 0:
@@ -59,7 +76,7 @@ class PlinkoGame:
                 bias += 0.03 * min(abs(position), 3)  # More likely to go right if left of center
             
             # Clamp bias
-            bias = max(0.35, min(0.65, bias))
+            bias = max(0.30, min(0.70, bias))
             
             # Determine direction with bias
             direction = "L" if rng.random_float() < bias else "R"
@@ -67,8 +84,9 @@ class PlinkoGame:
             path.append(direction)
         
         # Convert final position to slot index
-        # Position ranges from -rows to +rows, map to 0 to 2*rows
-        slot_index = position + rows
+        # Position ranges from -rows to +rows, map to 0 to len(multipliers)
+        center_slot = len(multipliers) // 2
+        slot_index = center_slot + position
         
         # Clamp to valid range
         slot_index = max(0, min(slot_index, len(multipliers) - 1))

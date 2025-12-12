@@ -7,88 +7,101 @@
         <p class="admin-welcome">Welcome, Administrator. You have unlimited funds.</p>
     </div>
 
-    <div class="admin-grid">
-        <!-- Platform Stats -->
-        <div class="admin-card">
-            <h3>📊 Platform Overview</h3>
-            <div class="status-grid">
-                <div class="status-item">
-                    <span class="label">Total Users</span>
-                    <span class="value">{{ stats.users.user_count or 0 }}</span>
+    <!-- Tab Navigation -->
+    <div class="admin-tabs">
+        <button class="admin-tab active" onclick="showAdminTab('overview')">📊 Overview</button>
+        <button class="admin-tab" onclick="showAdminTab('users')">👥 Users</button>
+        <button class="admin-tab" onclick="showAdminTab('odds')">🎲 Odds</button>
+        <button class="admin-tab" onclick="showAdminTab('logs')">📋 Logs</button>
+    </div>
+
+    <!-- Overview Tab -->
+    <div id="overview-tab" class="admin-tab-content active">
+        <div class="admin-grid">
+            <!-- Platform Stats -->
+            <div class="admin-card">
+                <h3>📊 Platform Overview</h3>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="label">Total Users</span>
+                        <span class="value">{{ stats.users.user_count or 0 }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Total Games</span>
+                        <span class="value">{{ stats.users.total_games or 0 }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Total Wagered</span>
+                        <span class="value">${{ "%.2f"|format(stats.users.platform_wagered or 0) }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Total Cash</span>
+                        <span class="value cash">${{ "%.2f"|format(stats.users.total_cash or 0) }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Total Credits</span>
+                        <span class="value credits">{{ "%.2f"|format(stats.users.total_credits or 0) }} CR</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Transactions</span>
+                        <span class="value">{{ stats.transactions.tx_count or 0 }}</span>
+                    </div>
                 </div>
-                <div class="status-item">
-                    <span class="label">Total Games</span>
-                    <span class="value">{{ stats.users.total_games or 0 }}</span>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="admin-card">
+                <h3>⚡ Quick Actions</h3>
+                <div class="quick-actions">
+                    <a href="/" class="admin-btn play">🎮 Play Games</a>
+                    <a href="/exchange" class="admin-btn">💱 Exchange</a>
+                    <button onclick="clearAllData()" class="admin-btn danger">🗑️ Reset All</button>
                 </div>
-                <div class="status-item">
-                    <span class="label">Total Wagered</span>
-                    <span class="value">${{ "%.2f"|format(stats.users.platform_wagered or 0) }}</span>
+            </div>
+
+            <!-- Game Stats -->
+            <div class="admin-card">
+                <h3>🎲 Game Statistics</h3>
+                <div class="game-stats-list">
+                    {% for game in game_stats %}
+                    <div class="game-stat-row">
+                        <span class="game-name">{{ game.game|capitalize }}</span>
+                        <span class="stat">{{ game.total_plays }} plays</span>
+                        <span class="stat wagered">${{ "%.0f"|format(game.total_wagered or 0) }}</span>
+                        <span class="stat won">${{ "%.0f"|format(game.total_won or 0) }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if not game_stats %}
+                    <p style="color: var(--text-dim);">No game data yet</p>
+                    {% endif %}
                 </div>
-                <div class="status-item">
-                    <span class="label">Total Cash</span>
-                    <span class="value cash">${{ "%.2f"|format(stats.users.total_cash or 0) }}</span>
-                </div>
-                <div class="status-item">
-                    <span class="label">Total Credits</span>
-                    <span class="value credits">{{ "%.2f"|format(stats.users.total_credits or 0) }} CR</span>
-                </div>
-                <div class="status-item">
-                    <span class="label">Transactions</span>
-                    <span class="value">{{ stats.transactions.tx_count or 0 }}</span>
+            </div>
+
+            <!-- Leaderboard -->
+            <div class="admin-card">
+                <h3>🏆 Top Players</h3>
+                <div class="leaderboard-list">
+                    {% for player in leaderboard %}
+                    <div class="leaderboard-row">
+                        <span class="rank">#{{ loop.index }}</span>
+                        <span class="player-name">{{ player.username }}</span>
+                        <span class="stat won">${{ "%.0f"|format(player.total_won or 0) }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if not leaderboard %}
+                    <p style="color: var(--text-dim);">No players yet</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Quick Actions -->
-        <div class="admin-card">
-            <h3>⚡ Quick Actions</h3>
-            <div class="quick-actions">
-                <a href="/" class="admin-btn play">🎮 Play Games</a>
-                <a href="/exchange" class="admin-btn">💱 Exchange</a>
-            </div>
-        </div>
-
-        <!-- Game Stats -->
-        <div class="admin-card">
-            <h3>🎲 Game Statistics</h3>
-            <div class="game-stats-list">
-                {% for game in game_stats %}
-                <div class="game-stat-row">
-                    <span class="game-name">{{ game.game|capitalize }}</span>
-                    <span class="stat">{{ game.total_plays }} plays</span>
-                    <span class="stat wagered">${{ "%.0f"|format(game.total_wagered or 0) }}</span>
-                    <span class="stat won">${{ "%.0f"|format(game.total_won or 0) }}</span>
-                </div>
-                {% endfor %}
-                {% if not game_stats %}
-                <p style="color: var(--text-dim);">No game data yet</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Leaderboard -->
-        <div class="admin-card">
-            <h3>🏆 Top Players</h3>
-            <div class="leaderboard-list">
-                {% for player in leaderboard %}
-                <div class="leaderboard-row">
-                    <span class="rank">#{{ loop.index }}</span>
-                    <span class="player-name">{{ player.username }}</span>
-                    <span class="stat won">${{ "%.0f"|format(player.total_won or 0) }}</span>
-                </div>
-                {% endfor %}
-                {% if not leaderboard %}
-                <p style="color: var(--text-dim);">No players yet</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- User Management -->
+    <!-- Users Tab -->
+    <div id="users-tab" class="admin-tab-content">
         <div class="admin-card wide">
             <h3>👥 User Management</h3>
-            <p style="color: var(--text-dim); margin-bottom: 15px; font-size: 0.9rem;">
-                To manage users: Use the API endpoints directly or restart server to apply changes.
-            </p>
+            <p style="color: var(--text-dim); margin-bottom: 15px;">Click on any user row to manage their account.</p>
+
             <div class="users-table-container">
                 <table class="users-table">
                     <thead>
@@ -98,8 +111,7 @@
                             <th>Cash</th>
                             <th>Credits</th>
                             <th>Games</th>
-                            <th>Total Wagered</th>
-                            <th>Total Won</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -110,37 +122,692 @@
                             <td class="cash">${{ "%.2f"|format(u.cash) }}</td>
                             <td class="credits">{{ "%.2f"|format(u.credits) }} CR</td>
                             <td>{{ u.games_played }}</td>
-                            <td>${{ "%.2f"|format(u.total_wagered) }}</td>
-                            <td class="won">${{ "%.2f"|format(u.total_won) }}</td>
+                            <td class="action-buttons">
+                                <button
+                                    onclick="editUser({{ u.id }}, '{{ u.username }}', {{ u.cash }}, {{ u.credits }})"
+                                    class="action-btn edit">✏️</button>
+                                <button onclick="resetUser({{ u.id }}, '{{ u.username }}')"
+                                    class="action-btn reset">🔄</button>
+                                <button onclick="deleteUser({{ u.id }}, '{{ u.username }}')"
+                                    class="action-btn delete">🗑️</button>
+                            </td>
                         </tr>
                         {% endfor %}
                         {% if not users %}
                         <tr>
-                            <td colspan="7" style="text-align: center; color: var(--text-dim);">No users yet</td>
+                            <td colspan="6" style="text-align: center; color: var(--text-dim);">No users yet</td>
                         </tr>
                         {% endif %}
                     </tbody>
                 </table>
             </div>
         </div>
+    </div>
 
-        <!-- Session -->
-        <div class="admin-card">
-            <h3>🔒 Session</h3>
-            <p style="color: var(--text-dim); margin-bottom: 20px;">Admin session expires after 1 hour.</p>
-            <a href="/logout" class="admin-btn logout">Logout</a>
-        </div>
+    <!-- Odds Tab -->
+    <div id="odds-tab" class="admin-tab-content">
+        <div class="admin-card wide">
+            <h3>🎲 Game Odds Configuration</h3>
+            <p style="color: var(--text-dim); margin-bottom: 15px;">
+                Edit odds in real-time. Changes apply immediately to all games.
+            </p>
 
-        <!-- API Info -->
-        <div class="admin-card">
-            <h3>🔧 Admin API</h3>
-            <div style="font-size: 0.85rem; color: var(--text-dim);">
-                <p style="margin-bottom: 8px;"><strong>Reset User:</strong> POST /admin/api/reset-user</p>
-                <p style="margin-bottom: 8px;"><strong>Delete User:</strong> POST /admin/api/delete-user</p>
-                <p style="margin-bottom: 8px;"><strong>Grant Funds:</strong> POST /admin/api/grant-funds</p>
-                <p><strong>Clear All:</strong> POST /admin/api/clear-all</p>
+            <div class="odds-examples">
+                <details>
+                    <summary>📖 How to change odds (click to expand)</summary>
+                    <div class="examples-content">
+                        <h4>Plinko:</h4>
+                        <ul>
+                            <li><strong>center_bias</strong>: 0.0-1.0. Lower = more edge wins (better for player).
+                                Default: 0.35</li>
+                            <li><strong>multipliers</strong>: Array of payouts. Middle slots hit most. Edge slots =
+                                jackpots.</li>
+                        </ul>
+
+                        <h4>Slots:</h4>
+                        <ul>
+                            <li><strong>symbol_weights</strong>: Higher = more common. 🍒=25 (common), 7️⃣=3 (rare)</li>
+                            <li><strong>payouts_3x</strong>: Multiplier for triple match. 7️⃣=100 means 100x bet.</li>
+                            <li><strong>payouts_2x</strong>: Multiplier for double match.</li>
+                        </ul>
+
+                        <h4>Coinflip:</h4>
+                        <ul>
+                            <li><strong>player_odds</strong>: 0.5 = fair (50/50). Higher = better for player.</li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
+
+            <div class="odds-editor-container">
+                <textarea id="odds-editor" class="odds-editor">{{ current_odds }}</textarea>
+            </div>
+
+            <div class="odds-actions">
+                <button onclick="saveOdds()" class="admin-btn save">💾 Save Odds</button>
+                <button onclick="reloadOdds()" class="admin-btn">🔄 Reload from File</button>
+                <span id="odds-status" class="status-message"></span>
             </div>
         </div>
     </div>
+
+    <!-- Logs Tab -->
+    <div id="logs-tab" class="admin-tab-content">
+        <div class="admin-card wide">
+            <h3>📋 Application Logs</h3>
+
+            <div class="log-controls">
+                <select id="log-level" onchange="loadLogs()">
+                    <option value="all">All Levels</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                </select>
+                <select id="log-lines" onchange="loadLogs()">
+                    <option value="50">Last 50 lines</option>
+                    <option value="100" selected>Last 100 lines</option>
+                    <option value="200">Last 200 lines</option>
+                </select>
+                <button onclick="loadLogs()" class="admin-btn">🔄 Refresh</button>
+            </div>
+
+            <div class="log-viewer" id="log-viewer">
+                <p style="color: var(--text-dim);">Click Refresh to load logs...</p>
+            </div>
+
+            <p class="log-hint">💡 Enable file logging: Set <code>logging.log_to_file = true</code> in config.json</p>
+        </div>
+    </div>
+
+    <!-- Session Card -->
+    <div class="admin-card session-card">
+        <h3>🔒 Session</h3>
+        <p style="color: var(--text-dim);">Admin session expires after 1 hour.</p>
+        <a href="/logout" class="admin-btn logout">Logout</a>
+    </div>
 </div>
+
+<!-- Edit User Modal -->
+<div id="edit-modal" class="modal">
+    <div class="modal-content">
+        <h3>✏️ Edit User: <span id="edit-username"></span></h3>
+        <input type="hidden" id="edit-user-id">
+
+        <div class="form-group">
+            <label>Cash ($)</label>
+            <input type="number" id="edit-cash" step="0.01">
+        </div>
+
+        <div class="form-group">
+            <label>Credits (CR)</label>
+            <input type="number" id="edit-credits" step="0.01">
+        </div>
+
+        <div class="modal-actions">
+            <button onclick="saveUserEdit()" class="admin-btn save">💾 Save</button>
+            <button onclick="closeModal()" class="admin-btn cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Tab switching
+    function showAdminTab(tab) {
+        document.querySelectorAll('.admin-tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(tab + '-tab').classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    // User Management
+    function editUser(id, username, cash, credits) {
+        document.getElementById('edit-user-id').value = id;
+        document.getElementById('edit-username').textContent = username;
+        document.getElementById('edit-cash').value = cash;
+        document.getElementById('edit-credits').value = credits;
+        document.getElementById('edit-modal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('edit-modal').classList.remove('active');
+    }
+
+    async function saveUserEdit() {
+        const userId = parseInt(document.getElementById('edit-user-id').value);
+        const cash = parseFloat(document.getElementById('edit-cash').value);
+        const credits = parseFloat(document.getElementById('edit-credits').value);
+
+        const response = await fetch('/admin/api/set-balance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, cash, credits })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            alert('User balance updated!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    }
+
+    async function resetUser(id, username) {
+        if (!confirm(`Reset ${username} to starting balance? This will clear their stats.`)) return;
+
+        const response = await fetch('/admin/api/reset-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: id })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            alert('User reset!');
+            location.reload();
+        }
+    }
+
+    async function deleteUser(id, username) {
+        if (!confirm(`DELETE ${username}? This cannot be undone!`)) return;
+
+        const response = await fetch('/admin/api/delete-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: id })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            alert('User deleted!');
+            location.reload();
+        }
+    }
+
+    async function clearAllData() {
+        if (!confirm('CLEAR ALL DATA? This deletes all users and transactions!')) return;
+        if (!confirm('Are you ABSOLUTELY sure?')) return;
+
+        const response = await fetch('/admin/api/clear-all', { method: 'POST' });
+        const data = await response.json();
+        alert('All data cleared!');
+        location.reload();
+    }
+
+    // Odds Management
+    async function saveOdds() {
+        const editor = document.getElementById('odds-editor');
+        const status = document.getElementById('odds-status');
+
+        try {
+            const oddsData = JSON.parse(editor.value);
+
+            const response = await fetch('/admin/api/odds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ odds_data: oddsData })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                status.textContent = '✅ Saved! Changes are active immediately.';
+                status.className = 'status-message success';
+            } else {
+                status.textContent = '❌ ' + data.error;
+                status.className = 'status-message error';
+            }
+        } catch (e) {
+            status.textContent = '❌ Invalid JSON: ' + e.message;
+            status.className = 'status-message error';
+        }
+    }
+
+    async function reloadOdds() {
+        const response = await fetch('/admin/api/odds/reload', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.success) {
+            document.getElementById('odds-editor').value = JSON.stringify(data.odds, null, 2);
+            document.getElementById('odds-status').textContent = '✅ Reloaded from file';
+        }
+    }
+
+    // Logs
+    async function loadLogs() {
+        const level = document.getElementById('log-level').value;
+        const lines = document.getElementById('log-lines').value;
+        const viewer = document.getElementById('log-viewer');
+
+        viewer.innerHTML = '<p>Loading...</p>';
+
+        const response = await fetch(`/admin/api/logs?level=${level}&lines=${lines}`);
+        const data = await response.json();
+
+        if (data.logs.length === 0) {
+            viewer.innerHTML = '<p style="color: var(--text-dim);">No logs found</p>';
+        } else {
+            viewer.innerHTML = data.logs.map(log => {
+                let cls = 'log-line';
+                if (log.includes('ERROR')) cls += ' error';
+                else if (log.includes('WARNING')) cls += ' warning';
+                else if (log.includes('INFO')) cls += ' info';
+                return `<div class="${cls}">${escapeHtml(log)}</div>`;
+            }).join('');
+
+            // Scroll to bottom
+            viewer.scrollTop = viewer.scrollHeight;
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+
+<style>
+    .admin-panel {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .admin-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .admin-welcome {
+        opacity: 0.7;
+    }
+
+    .admin-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .admin-tab {
+        padding: 0.75rem 1.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: none;
+        border-radius: 8px;
+        color: inherit;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .admin-tab.active {
+        background: linear-gradient(135deg, #00d4ff, #00a0cc);
+    }
+
+    .admin-tab-content {
+        display: none;
+    }
+
+    .admin-tab-content.active {
+        display: block;
+    }
+
+    .admin-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .admin-card {
+        background: var(--card-bg, rgba(255, 255, 255, 0.05));
+        border-radius: 12px;
+        padding: 1.5rem;
+    }
+
+    .admin-card.wide {
+        grid-column: 1 / -1;
+    }
+
+    .admin-card h3 {
+        margin-bottom: 1rem;
+    }
+
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    .status-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .status-item .label {
+        font-size: 0.85rem;
+        opacity: 0.6;
+    }
+
+    .status-item .value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .status-item .value.cash {
+        color: #4ade80;
+    }
+
+    .status-item .value.credits {
+        color: #00d4ff;
+    }
+
+    .quick-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .admin-btn {
+        padding: 0.75rem 1.25rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .admin-btn:hover {
+        transform: translateY(-2px);
+    }
+
+    .admin-btn.play {
+        background: linear-gradient(135deg, #4ade80, #22c55e);
+    }
+
+    .admin-btn.save {
+        background: linear-gradient(135deg, #00d4ff, #00a0cc);
+    }
+
+    .admin-btn.danger {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    .admin-btn.logout {
+        background: rgba(239, 68, 68, 0.2);
+    }
+
+    .users-table-container {
+        overflow-x: auto;
+    }
+
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .users-table th,
+    .users-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .users-table th {
+        font-size: 0.85rem;
+        opacity: 0.6;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .action-btn {
+        padding: 0.5rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.1);
+        transition: all 0.2s;
+    }
+
+    .action-btn.edit:hover {
+        background: #3b82f6;
+    }
+
+    .action-btn.reset:hover {
+        background: #f59e0b;
+    }
+
+    .action-btn.delete:hover {
+        background: #ef4444;
+    }
+
+    .game-stat-row,
+    .leaderboard-row {
+        display: flex;
+        gap: 1rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        align-items: center;
+    }
+
+    .game-name,
+    .player-name {
+        flex: 1;
+        font-weight: 600;
+    }
+
+    .rank {
+        font-weight: 700;
+        color: #ffd700;
+    }
+
+    .stat {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
+
+    .stat.won {
+        color: #4ade80;
+    }
+
+    /* Odds Editor */
+    .odds-examples {
+        margin-bottom: 1rem;
+    }
+
+    .odds-examples summary {
+        cursor: pointer;
+        color: #00d4ff;
+    }
+
+    .examples-content {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        font-size: 0.9rem;
+    }
+
+    .examples-content h4 {
+        margin: 0.5rem 0;
+        color: #ffd700;
+    }
+
+    .examples-content ul {
+        margin: 0.5rem 0;
+        padding-left: 1.5rem;
+    }
+
+    .odds-editor {
+        width: 100%;
+        height: 400px;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 1rem;
+        color: #e0e0e0;
+        font-family: 'Consolas', monospace;
+        font-size: 0.9rem;
+        resize: vertical;
+    }
+
+    .odds-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+        align-items: center;
+    }
+
+    .status-message {
+        font-size: 0.9rem;
+    }
+
+    .status-message.success {
+        color: #4ade80;
+    }
+
+    .status-message.error {
+        color: #ef4444;
+    }
+
+    /* Log Viewer */
+    .log-controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .log-controls select {
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        color: inherit;
+    }
+
+    .log-viewer {
+        height: 400px;
+        overflow-y: auto;
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: 'Consolas', monospace;
+        font-size: 0.8rem;
+    }
+
+    .log-line {
+        padding: 0.25rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+
+    .log-line.error {
+        color: #ef4444;
+    }
+
+    .log-line.warning {
+        color: #f59e0b;
+    }
+
+    .log-line.info {
+        color: #4ade80;
+    }
+
+    .log-hint {
+        margin-top: 1rem;
+        font-size: 0.85rem;
+        opacity: 0.6;
+    }
+
+    .log-hint code {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: var(--card-bg, #1a1a2e);
+        border-radius: 12px;
+        padding: 2rem;
+        max-width: 400px;
+        width: 90%;
+    }
+
+    .modal-content h3 {
+        margin-bottom: 1.5rem;
+    }
+
+    .modal-content .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .modal-content label {
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .modal-content input {
+        width: 100%;
+        padding: 0.75rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: inherit;
+    }
+
+    .modal-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .admin-btn.cancel {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .session-card {
+        margin-top: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .session-card h3 {
+        margin: 0;
+    }
+
+    .session-card p {
+        margin: 0;
+        flex: 1;
+    }
+</style>
 {% endblock %}

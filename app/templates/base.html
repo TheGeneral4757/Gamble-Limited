@@ -21,6 +21,8 @@
             <nav>
                 <a href="/" class="nav-link">Home</a>
                 <a href="/exchange" class="nav-link">Exchange</a>
+                <a href="/history" class="nav-link">History</a>
+                <a href="/leaderboard" class="nav-link">🏆 Leaderboard</a>
                 {% if user and user.is_admin %}
                 <a href="/admin" class="nav-link admin-link">Admin</a>
                 {% endif %}
@@ -37,16 +39,340 @@
             </div>
         </header>
 
+        {% if gamble_friday_active %}
+        <div class="gamble-friday-banner">
+            <div class="banner-content">
+                <span class="banner-icon">🎰</span>
+                <div class="banner-text">
+                    <strong>GAMBLE FRIDAY</strong>
+                    <span>{{ gamble_friday_multiplier }}x winnings on all games! Max bets increased 3x!</span>
+                </div>
+                <span class="banner-icon">💰</span>
+            </div>
+        </div>
+        {% endif %}
+
         <main class="content">
             {% block content %}{% endblock %}
         </main>
 
         <footer class="main-footer">
             <p>&copy; 2025 {{ app_name }}. Provably Fair & True RNG.</p>
+            <p class="footer-links">
+                <a href="/tos">Terms of Service</a> |
+                <a href="/privacy">Privacy Policy</a>
+            </p>
         </footer>
     </div>
 
+    <!-- Big Win Toast -->
+    <div id="big-win-toast" class="big-win-toast">
+        <span class="big-win-icon">🎉</span>
+        <span class="big-win-text"></span>
+    </div>
+
+    <!-- Chat Widget -->
+    {% if user %}
+    <div id="chat-widget" class="chat-widget minimized">
+        <div class="chat-header" onclick="toggleChat()">
+            <span>💬 Live Chat</span>
+            <span class="chat-badge" id="chat-badge">0</span>
+        </div>
+        <div class="chat-body">
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="chat-input-container">
+                <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200"
+                    onkeypress="handleChatKeypress(event)">
+                <button onclick="sendChatMessage()" class="chat-send">Send</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <script src="/static/js/main.js"></script>
+
+    <!-- WebSocket Client -->
+    <script>
+        {% if user %}
+        (function () {
+            let ws = null;
+            let reconnectAttempts = 0;
+            let unreadCount = 0;
+            const chatMinimized = () => document.getElementById('chat-widget')?.classList.contains('minimized');
+
+            function connectWebSocket() {
+                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+                ws.onopen = function () {
+                    console.log('WebSocket connected');
+                    reconnectAttempts = 0;
+                };
+
+                ws.onmessage = function (event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleWebSocketMessage(data);
+                    } catch (e) { }
+                };
+
+                ws.onclose = function () {
+                    // Reconnect with exponential backoff
+                    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                    reconnectAttempts++;
+                    setTimeout(connectWebSocket, delay);
+                };
+
+                ws.onerror = function () { };
+            }
+
+            function handleWebSocketMessage(data) {
+                switch (data.type) {
+                    case 'balance_update':
+                        if (document.getElementById('cash-balance')) {
+                            document.getElementById('cash-balance').textContent = data.balance.cash.toFixed(2);
+                            document.getElementById('credits-balance').textContent = data.balance.credits.toFixed(2);
+                        }
+                        break;
+
+                    case 'big_win':
+                        showBigWinToast(data.username, data.game, data.amount, data.multiplier);
+                        break;
+
+                    case 'chat_message':
+                        addChatMessage(data.message);
+                        break;
+
+                    case 'chat_history':
+                        data.messages.forEach(msg => addChatMessage(msg, true));
+                        break;
+
+                    case 'gift_notification':
+                        showGiftToast(data.message, data.gifter);
+                        // Also update balance
+                        fetch('/api/economy/balance')
+                            .then(r => r.json())
+                            .then(bal => {
+                                if (document.getElementById('cash-balance') && !bal.is_admin) {
+                                    document.getElementById('cash-balance').textContent = bal.cash.toFixed(2);
+                                    document.getElementById('credits-balance').textContent = bal.credits.toFixed(2);
+                                }
+                            });
+                        break;
+                }
+            }
+
+            function showBigWinToast(username, game, amount, multiplier) {
+                const toast = document.getElementById('big-win-toast');
+                const text = toast.querySelector('.big-win-text');
+                text.textContent = `${username} won $${amount.toFixed(2)} on ${game}! (${multiplier}x)`;
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 5000);
+            }
+
+            function showGiftToast(message, gifter) {
+                const toast = document.getElementById('big-win-toast');
+                const icon = toast.querySelector('.big-win-icon');
+                const text = toast.querySelector('.big-win-text');
+                icon.textContent = gifter === 'THE HOUSE' ? '🏛️' : '🎁';
+                text.textContent = message;
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 6000);
+            }
+
+            function addChatMessage(msg, silent) {
+                const container = document.getElementById('chat-messages');
+                if (!container) return;
+
+                const div = document.createElement('div');
+                div.className = 'chat-message';
+                const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                div.innerHTML = `<span class="chat-time">${time}</span> <strong>${escapeHtml(msg.username)}:</strong> ${escapeHtml(msg.message)}`;
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+
+                if (!silent && chatMinimized()) {
+                    unreadCount++;
+                    updateChatBadge();
+                }
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function updateChatBadge() {
+                const badge = document.getElementById('chat-badge');
+                if (badge) {
+                    badge.textContent = unreadCount;
+                    badge.style.display = unreadCount > 0 ? 'inline' : 'none';
+                }
+            }
+
+            window.toggleChat = function () {
+                const widget = document.getElementById('chat-widget');
+                widget.classList.toggle('minimized');
+                if (!widget.classList.contains('minimized')) {
+                    unreadCount = 0;
+                    updateChatBadge();
+                    document.getElementById('chat-input').focus();
+                }
+            };
+
+            window.sendChatMessage = function () {
+                const input = document.getElementById('chat-input');
+                const message = input.value.trim();
+                if (message && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'chat', message: message }));
+                    input.value = '';
+                }
+            };
+
+            window.handleChatKeypress = function (e) {
+                if (e.key === 'Enter') sendChatMessage();
+            };
+
+            // Connect on page load
+            connectWebSocket();
+            updateChatBadge();
+
+            // Keep-alive ping every 30s
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 30000);
+        })();
+        {% endif %}
+    </script>
+
+    <style>
+        /* Big Win Toast */
+        .big-win-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            color: #000;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 10000;
+            transition: transform 0.5s ease;
+            box-shadow: 0 8px 32px rgba(255, 215, 0, 0.4);
+        }
+
+        .big-win-toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .big-win-icon {
+            font-size: 1.5rem;
+            animation: pulse 0.5s ease infinite alternate;
+        }
+
+        @keyframes pulse {
+            to {
+                transform: scale(1.2);
+            }
+        }
+
+        /* Chat Widget */
+        .chat-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 320px;
+            background: rgba(20, 20, 35, 0.98);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            z-index: 9000;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .chat-widget.minimized {
+            width: auto;
+        }
+
+        .chat-widget.minimized .chat-body {
+            display: none;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #00d4ff, #00a0cc);
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .chat-badge {
+            background: #ef4444;
+            color: white;
+            padding: 0.125rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            display: none;
+        }
+
+        .chat-body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            height: 250px;
+            overflow-y: auto;
+            padding: 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .chat-message {
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .chat-time {
+            opacity: 0.5;
+            font-size: 0.75rem;
+        }
+
+        .chat-input-container {
+            display: flex;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .chat-input-container input {
+            flex: 1;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            color: inherit;
+            margin-right: 0.5rem;
+        }
+
+        .chat-send {
+            padding: 0.5rem 1rem;
+            background: #00d4ff;
+            border: none;
+            border-radius: 6px;
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+        }
+    </style>
+
     {% block scripts %}{% endblock %}
 </body>
 

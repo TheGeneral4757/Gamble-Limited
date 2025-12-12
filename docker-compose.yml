@@ -1,0 +1,46 @@
+# RNG-THING Docker Compose Configuration
+# For development and production deployment
+
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: rng-thing
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist database across container restarts
+      - ./data:/app/data
+      # Mount config file (read-only in production)
+      - ./config.json:/app/config.json:ro
+    env_file:
+      - .env
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - DEBUG=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Optional: Nginx reverse proxy for production
+  # Uncomment to use with Cloudflare or direct HTTPS
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: rng-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - web
+  #   restart: unless-stopped
+
+volumes:
+  data:

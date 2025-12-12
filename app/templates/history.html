@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2>📜 Transaction History</h2>
+        <p>Your last 50 transactions and game results</p>
+    </div>
+    
+    <div class="history-container">
+        <div id="history-loading" class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading transactions...</p>
+        </div>
+        
+        <div id="history-empty" class="empty-state" style="display: none;">
+            <p>📭 No transactions yet. Start playing to see your history!</p>
+        </div>
+        
+        <table id="history-table" class="data-table" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Game</th>
+                    <th>Amount</th>
+                    <th>Balance After</th>
+                </tr>
+            </thead>
+            <tbody id="history-body">
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="action-buttons">
+        <a href="/" class="btn btn-secondary">← Back to Games</a>
+        <button onclick="loadHistory()" class="btn btn-primary">🔄 Refresh</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadHistory() {
+    const loading = document.getElementById('history-loading');
+    const empty = document.getElementById('history-empty');
+    const table = document.getElementById('history-table');
+    const tbody = document.getElementById('history-body');
+    
+    loading.style.display = 'block';
+    empty.style.display = 'none';
+    table.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/economy/transactions');
+        const data = await response.json();
+        
+        loading.style.display = 'none';
+        
+        if (!data.transactions || data.transactions.length === 0) {
+            empty.style.display = 'block';
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        data.transactions.forEach(tx => {
+            const row = document.createElement('tr');
+            const date = new Date(tx.created_at);
+            const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            
+            const isPositive = tx.amount > 0;
+            const amountClass = isPositive ? 'positive' : 'negative';
+            const amountSign = isPositive ? '+' : '';
+            
+            row.innerHTML = `
+                <td>${formattedDate}</td>
+                <td class="type-${tx.type}">${formatType(tx.type)}</td>
+                <td>${tx.game || '-'}</td>
+                <td class="${amountClass}">${amountSign}${tx.amount.toFixed(2)} ${tx.currency}</td>
+                <td>${tx.balance_after.toFixed(2)}</td>
+            `;
+            tbody.appendChild(row);
+        });
+        
+        table.style.display = 'table';
+    } catch (error) {
+        loading.innerHTML = '<p class="error">Failed to load history. Please try again.</p>';
+    }
+}
+
+function formatType(type) {
+    const typeMap = {
+        'bet': '🎲 Bet',
+        'win': '🏆 Win',
+        'daily_bonus': '🎁 Daily Bonus',
+        'exchange': '💱 Exchange',
+        'admin_grant': '⚙️ Admin Grant'
+    };
+    return typeMap[type] || type;
+}
+
+// Load on page load
+loadHistory();
+</script>
+
+<style>
+.page-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.page-header h2 {
+    margin-bottom: 0.5rem;
+}
+
+.history-container {
+    background: var(--card-bg, rgba(255,255,255,0.05));
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.loading-state, .empty-state {
+    text-align: center;
+    padding: 3rem;
+    opacity: 0.7;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top: 3px solid var(--accent, #00d4ff);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th, .data-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.data-table th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    opacity: 0.7;
+}
+
+.positive { color: #4ade80; }
+.negative { color: #f87171; }
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #00d4ff, #00a0cc);
+    color: white;
+}
+
+.btn-secondary {
+    background: rgba(255,255,255,0.1);
+    color: white;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.error { color: #f87171; }
+</style>
+{% endblock %}

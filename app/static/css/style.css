@@ -1769,3 +1769,54 @@ body {
         font-size: 0.7rem;
     }
 }
+
+/* ========== GAMBLE FRIDAY BANNER ========== */
+.gamble-friday-banner {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24, #f59e0b);
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease infinite;
+    padding: 12px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+}
+
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.banner-icon {
+    font-size: 2rem;
+    animation: bounce 1s ease infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+.banner-text {
+    text-align: center;
+    color: #0a0a0f;
+}
+
+.banner-text strong {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.banner-text span {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
