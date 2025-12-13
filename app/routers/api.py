@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from app.core.economy import economy
 from app.core.database import db
 from app.core.games.slots import slots_game
@@ -8,6 +8,11 @@ from app.core.games.blackjack import blackjack_game
 from app.core.games.roulette import roulette_game
 from app.core.games.plinko import plinko_game
 from app.core.games.coinflip import coinflip_game
+from app.core.games.scratch_cards import scratch_cards_game
+from app.core.games.highlow import highlow_game
+from app.core.games.dice import dice_game
+from app.core.games.number_guess import number_guess_game
+from app.core.games.lottery import lottery_system
 from app.config import settings
 from app.core.logger import get_logger
 
@@ -50,6 +55,30 @@ class CoinflipRequest(BaseModel):
 class ExchangeRequest(BaseModel):
     from_currency: str
     amount: float
+
+class HighLowGuessRequest(BaseModel):
+    game_id: str
+    choice: str
+
+class HighLowCashoutRequest(BaseModel):
+    game_id: str
+
+class DiceRequest(BaseModel):
+    bet: float
+    bet_type: str
+    bet_value: Optional[str] = ""
+
+class NumberGuessRequest(BaseModel):
+    bet: float
+    guess: int
+
+class LotteryBuyRequest(BaseModel):
+    numbers: List[int]
+
+class CoinFlipResponseRequest(BaseModel):
+    request_id: int
+    agreed: bool
+
 
 # ==================== Helpers ====================
 
@@ -94,7 +123,7 @@ def get_rate_limit():
 @router.get("/economy/rate")
 async def get_exchange_rate(request: Request):
     user_id, _, _ = get_user_id(request)
-    rate = economy.get_current_exchange_rate(user_id if user_id > 0 else None)
+    rate = economy.get_current_exchange_rate()
     return {"rate": rate}
 
 @router.get("/economy/balance")
@@ -344,3 +373,225 @@ async def coinflip_flip(request: Request, data: CoinflipRequest):
     
     balance = {"cash": 999999, "credits": 999999} if is_true_admin else economy.get_balance(user_id)
     return {**result, "balance": balance}
+
+# ==================== New Game Endpoints ====================
+
+@router.post("/games/scratch-cards/buy")
+async def scratch_cards_buy(request: Request, data: BetRequest):
+    user_id, is_admin, user_type = get_user_id(request)
+    is_true_admin = is_admin and user_type != "house"
+    
+    validation = validate_bet(user_id, data.bet, "scratch_cards", is_admin, user_type)
+    if not validation["valid"]:
+        raise HTTPException(status_code=400, detail=validation["error"])
+    
+    if not is_true_admin:
+        economy.place_bet(user_id, data.bet, "scratch_cards")
+        db.add_house_cut(data.bet, "scratch_cards")
+    
+    result = scratch_cards_game.buy(data.bet)
+    
+    if result["payout"] > 0 and not is_true_admin:
+        economy.add_winnings(user_id, result["payout"], "scratch_cards", data.bet)
+    elif not is_true_admin:
+        db.record_game(user_id, "scratch_cards", data.bet, 0)
+    
+    balance = {"cash": 999999, "credits": 999999} if is_true_admin else economy.get_balance(user_id)
+    return {**result, "balance": balance}
+
+@router.post("/games/highlow/start")
+async def highlow_start(request: Request, data: BetRequest):
+    user_id, is_admin, user_type = get_user_id(request)
+    is_true_admin = is_admin and user_type != "house"
+    
+    validation = validate_bet(user_id, data.bet, "highlow", is_admin, user_type)
+    if not validation["valid"]:
+        raise HTTPException(status_code=400, detail=validation["error"])
+    
+    if not is_true_admin:
+        economy.place_bet(user_id, data.bet, "highlow")
+        db.add_house_cut(data.bet, "highlow")
+    
+    result = highlow_game.start(data.bet, user_id)
+    
+    balance = {"cash": 999999, "credits": 999999} if is_true_admin else economy.get_balance(user_id)
+    return {**result, "balance": balance}
+
+@router.post("/games/highlow/guess")
+async def highlow_guess(request: Request, data: HighLowGuessRequest):
+    user_id, is_admin, user_type = get_user_id(request)
+    is_true_admin = is_admin and user_type != "house"
+    
+    result = highlow_game.guess(data.game_id, user_id, data.choice)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    balance = {"cash": 999999, "credits": 999999} if is_true_admin else economy.get_balance(user_id)
+    return {**result, "balance": balance}
+
+@router.post("/games/highlow/cashout")
+async def highlow_cashout(request: Request, data: HighLowCashoutRequest):
+    user_id, is_admin, user_type = get_user_id(request)
+    is_true_admin = is_admin and user_type != "house"
+    
+    result = highlow_game.cashout(data.game_id, user_id)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    # Add winnings on successful cashout
+    if result.get("payout", 0) > 0 and not is_true_admin:
+        economy.add_winnings(user_id, result["payout"], "highlow", result.get("bet", 0))
+    
+    balance = {"cash": 999999, "credits": 999999} if is_true_admin else economy.get_balance(user_id)
+    return {**result, "balance": balance}
+
+@router.post("/games/dice/roll")
+async def dice_roll(request: Request, data: DiceRequest):
+    user_id, is_admin, user_type = get_user_id(request)
+    is_true_admin = is_admin and user_type != "house"
+    
+    validation = validate_bet(user_id, data.bet, "dice", is_admin, user_type)
+    if not validation["valid"]:
+        raise HTTPException(status_code=400, detail=validation["error"])
+    
+    if not is_true_admin:
+        economy.place_bet(user_id, data.bet, "dice")
+        db.add_house_cut(data.bet, "dice")
+    
+    result = dice_game.roll(data.bet, data.bet_type, data.bet_value)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    if result["payout"] > 0 and not is_true_admin:
+        economy.add_winnings(user_id, result["payout"], "dice", data.bet)
+    elif not is_true_admin:
+        db.record_game(user_id, "dice", data.bet, 0)
+    
+    balance = {"cash": 999999, "credits": 999999} if is_true_admin else economy.get_balance(user_id)
+    return {**result, "balance": balance}
+
+@router.post("/games/number-guess/guess")
+async def number_guess(request: Request, data: NumberGuessRequest):
+    user_id, is_admin, user_type = get_user_id(request)
+    is_true_admin = is_admin and user_type != "house"
+    
+    validation = validate_bet(user_id, data.bet, "number_guess", is_admin, user_type)
+    if not validation["valid"]:
+        raise HTTPException(status_code=400, detail=validation["error"])
+    
+    if not is_true_admin:
+        economy.place_bet(user_id, data.bet, "number_guess")
+        db.add_house_cut(data.bet, "number_guess")
+    
+    result = number_guess_game.guess(data.bet, data.guess)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    if result["payout"] > 0 and not is_true_admin:
+        economy.add_winnings(user_id, result["payout"], "number_guess", data.bet)
+    elif not is_true_admin:
+        db.record_game(user_id, "number_guess", data.bet, 0)
+    
+    balance = {"cash": 999999, "credits": 999999} if is_true_admin else economy.get_balance(user_id)
+    return {**result, "balance": balance}
+
+
+# ==================== Lottery Endpoints ====================
+
+@router.get("/games/lottery/info")
+async def lottery_info():
+    jackpot = db.get_lottery_jackpot()["current_amount"]
+    no_winner_months = db.get_lottery_jackpot()["no_winner_months"]
+    return lottery_system.get_lottery_info(jackpot, no_winner_months)
+
+@router.get("/games/lottery/tickets")
+async def lottery_tickets(request: Request):
+    user_id, _, _ = get_user_id(request)
+    if not user_id:
+        return []
+    draw_id = lottery_system.get_current_draw_id()
+    return db.get_user_lottery_tickets(user_id, draw_id)
+
+@router.get("/games/lottery/history")
+async def lottery_history():
+    return db.get_lottery_history()
+
+@router.post("/games/lottery/buy")
+async def lottery_buy(request: Request, data: LotteryBuyRequest):
+    user_id, _, user_type = get_user_id(request)
+    
+    # Check if lottery enabled
+    settings_dict = lottery_system._get_config()
+    if not settings_dict.get("enabled", True):
+        raise HTTPException(400, "Lottery is currently disabled")
+
+    # Validate numbers
+    validation = lottery_system.validate_numbers(data.numbers)
+    if not validation["valid"]:
+        raise HTTPException(400, validation["error"])
+
+    # Check ticket limit
+    draw_id = lottery_system.get_current_draw_id()
+    count = db.get_user_ticket_count(user_id, draw_id)
+    limit = lottery_system.get_max_tickets()
+    if count >= limit:
+         raise HTTPException(400, f"You have reached the limit of {limit} tickets for this draw")
+
+    # Pay for ticket (CASH, not credits)
+    price = lottery_system.get_ticket_price()
+    balance = economy.get_balance(user_id)
+    if balance["cash"] < price:
+        raise HTTPException(400, "Insufficient cash balance")
+    
+    # Deduct cash
+    db.update_balance(user_id, cash_delta=-price)
+    db.log_transaction(user_id, "lottery_buy", -price, balance["cash"] - price, 
+                       game="lottery", currency="cash")
+    
+    # Add to jackpot (Contribution logic)
+    contribution = price * 0.40
+    db.update_lottery_jackpot(delta=contribution)
+    
+    # Issue ticket
+    ticket = db.buy_lottery_ticket(user_id, data.numbers, draw_id)
+    
+    return ticket
+
+@router.get("/games/lottery/coinflip/status")
+async def lottery_coinflip_status(request: Request):
+    user_id, _, _ = get_user_id(request)
+    status = db.get_coin_flip_status(user_id)
+    return status or {"status": "none"}
+
+@router.post("/games/lottery/coinflip/respond")
+async def lottery_coinflip_respond(request: Request, data: CoinFlipResponseRequest):
+    user_id, _, _ = get_user_id(request)
+    result = db.respond_to_coin_flip(data.request_id, user_id, data.agreed)
+    return result
+
+@router.post("/games/lottery/draw-admin")
+async def lottery_draw_admin(request: Request):
+    user_id, is_admin, user_type = get_user_id(request)
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    # Force draw
+    try:
+        from app.core.games.lottery import lottery_system
+        result = lottery_system.perform_draw()
+        # Clean non-serializable objects effectively
+        safe_result = {
+            "winners": len(result.get("winners", [])),
+            "numbers": result.get("numbers", []),
+            "jackpot": result.get("jackpot", 0)
+        }
+        return {"success": True, "message": f"Draw triggered. Winners: {safe_result['winners']}", "result": safe_result}
+    except Exception as e:
+        logger.error(f"Manual draw failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+

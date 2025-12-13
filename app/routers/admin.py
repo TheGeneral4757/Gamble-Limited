@@ -40,6 +40,9 @@ class BanUserRequest(BaseModel):
     hours: int = 24
     reason: str = "Banned by admin"
 
+class SetJackpotRequest(BaseModel):
+    amount: float
+
 
 @router.get("")
 async def admin_panel(request: Request):
@@ -166,6 +169,17 @@ async def clear_all_data(request: Request):
     logger.warning("Admin cleared all data")
     result = db.clear_all_data()
     return result
+
+@router.post("/api/lottery/set-jackpot")
+async def set_jackpot(request: Request, data: SetJackpotRequest):
+    """Set the lottery jackpot amount manually."""
+    user = require_admin(request)
+    if not user:
+        return {"success": False, "error": "Unauthorized"}
+    
+    logger.info(f"Admin set lottery jackpot to {data.amount}")
+    result = db.update_lottery_jackpot(amount=data.amount)
+    return {"success": True, "jackpot": result}
 
 @router.post("/api/change-password")
 async def change_password(request: Request, data: PasswordChangeRequest):

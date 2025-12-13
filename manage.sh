@@ -57,8 +57,12 @@ function check_root {
 function install_dependencies {
     if ! command -v git &> /dev/null || ! command -v jq &> /dev/null; then
          print_info "Installing dependencies..."
-         apt-get update -y > /dev/null 2>&1
-         apt-get install -y curl jq git > /dev/null 2>&1
+         if command -v apt-get &> /dev/null; then
+             apt-get update -y > /dev/null 2>&1
+             apt-get install -y curl jq git > /dev/null 2>&1
+         else
+             print_warning "apt-get not found. Please install 'git' and 'jq' manually."
+         fi
     fi
     
     if ! command -v docker &> /dev/null; then
@@ -83,14 +87,14 @@ function check_for_updates {
     REMOTE=$(git rev-parse @{u})
     BASE=$(git merge-base @ @{u})
 
-    if [ $LOCAL = $REMOTE ]; then
+    if [ "$LOCAL" = "$REMOTE" ]; then
         print_success "Up to date."
         UPDATE_AVAILABLE=false
-    elif [ $LOCAL = $BASE ]; then
+    elif [ "$LOCAL" = "$BASE" ]; then
         print_success "New version available!"
         UPDATE_AVAILABLE=true
         handle_update
-    elif [ $REMOTE = $BASE ]; then
+    elif [ "$REMOTE" = "$BASE" ]; then
         print_warning "Local changes detected. Cannot safely update."
         UPDATE_AVAILABLE=false
     else
@@ -167,12 +171,20 @@ function interact_config {
     [ -z "$SECRET_KEY" ] && SECRET_KEY=$(openssl rand -hex 32)
     
     while true; do
-        read -p "Admin Password: " PASS
+        read -s -p "Admin Password: " PASS
+        echo ""
         [ -n "$PASS" ] && break
     done
 
-    read -p "Server Port [8000]: " PORT
-    PORT=${PORT:-8000}
+    while true; do
+        read -p "Server Port [8000]: " PORT
+        PORT=${PORT:-8000}
+        if [[ "$PORT" =~ ^[0-9]+$ ]] && [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ]; then
+             break
+        else
+             print_error "Invalid port. Please enter a number between 1 and 65535."
+        fi
+    done
     
     read -p "Cloudflare Tunnel Token (optional): " CF_TOKEN
     

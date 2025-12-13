@@ -102,6 +102,81 @@ class Database:
             )
         """)
         
+        # Lottery tickets
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS lottery_tickets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                draw_id TEXT NOT NULL,
+                numbers TEXT NOT NULL,
+                purchased_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        
+        # Lottery draws
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS lottery_draws (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                draw_id TEXT UNIQUE NOT NULL,
+                draw_date TEXT,
+                winning_numbers TEXT,
+                jackpot_amount REAL DEFAULT 0,
+                winners TEXT,
+                payout_type TEXT,
+                status TEXT DEFAULT 'pending',
+                no_winner_streak INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Lottery jackpot tracking
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS lottery_jackpot (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                current_amount REAL DEFAULT 10000.0,
+                no_winner_months INTEGER DEFAULT 0,
+                last_updated TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Initialize jackpot if not exists
+        cursor.execute("INSERT OR IGNORE INTO lottery_jackpot (id, current_amount) VALUES (1, 10000.0)")
+        
+        # Lottery installments
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS lottery_installments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                draw_id TEXT NOT NULL,
+                total_amount REAL NOT NULL,
+                paid_amount REAL DEFAULT 0,
+                per_payment REAL NOT NULL,
+                payments_remaining INTEGER NOT NULL,
+                next_payment_date TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        
+        # Lottery coin flip requests for multiple winners
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS lottery_coin_flips (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                draw_id TEXT NOT NULL,
+                user1_id INTEGER NOT NULL,
+                user2_id INTEGER NOT NULL,
+                user1_agreed INTEGER DEFAULT 0,
+                user2_agreed INTEGER DEFAULT 0,
+                winner_id INTEGER,
+                expires_at TEXT NOT NULL,
+                status TEXT DEFAULT 'pending',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user1_id) REFERENCES users(id),
+                FOREIGN KEY (user2_id) REFERENCES users(id)
+            )
+        """)
+        
         # Set default admin password if not exists
         cursor.execute("SELECT value FROM admin_settings WHERE key = 'admin_password'")
         if not cursor.fetchone():
@@ -775,7 +850,445 @@ class Database:
         """, (user_id,))
         
         return [dict(row) for row in cursor.fetchall()]
+    
+    # ==================== Lottery Functions ====================
+    
+    def get_lottery_jackpot(self) -> Dict:
+        """Get current lottery jackpot info."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM lottery_jackpot WHERE id = 1")
+        row = cursor.fetchone()
+        
+        if row:
+            return {
+                "current_amount": row["current_amount"],
+                "no_winner_months": row["no_winner_months"],
+                "last_updated": row["last_updated"]
+            }
+        return {"current_amount": 10000.0, "no_winner_months": 0, "last_updated": None}
+    
+    def update_lottery_jackpot(self, amount: float = None, delta: float = None, 
+                               no_winner_months: int = None) -> Dict:
+        """Update lottery jackpot amount."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        current = self.get_lottery_jackpot()
+        
+        if delta is not None:
+            new_amount = current["current_amount"] + delta
+        elif amount is not None:
+            new_amount = amount
+        else:
+            new_amount = current["current_amount"]
+        
+        new_months = no_winner_months if no_winner_months is not None else current["no_winner_months"]
+        
+        cursor.execute("""
+            UPDATE lottery_jackpot 
+            SET current_amount = ?, no_winner_months = ?, last_updated = ?
+            WHERE id = 1
+        """, (new_amount, new_months, datetime.now().isoformat()))
+        conn.commit()
+        
+        return self.get_lottery_jackpot()
+    
+    def buy_lottery_ticket(self, user_id: int, numbers: List[int], draw_id: str) -> Dict:
+        """
+        Purchase a lottery ticket.
+        
+        Args:
+            user_id: User buying the ticket
+            numbers: List of chosen numbers (as JSON)
+            draw_id: Draw identifier (YYYY-MM format)
+            
+        Returns:
+            Dict with success status and ticket info
+        """
+        import json
+        
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        # Store numbers as JSON
+        numbers_json = json.dumps(sorted(numbers))
+        
+        cursor.execute("""
+            INSERT INTO lottery_tickets (user_id, draw_id, numbers, purchased_at)
+            VALUES (?, ?, ?, ?)
+        """, (user_id, draw_id, numbers_json, datetime.now().isoformat()))
+        conn.commit()
+        
+        ticket_id = cursor.lastrowid
+        
+        logger.info(f"User {user_id} bought lottery ticket #{ticket_id} for draw {draw_id}")
+        
+        return {
+            "success": True,
+            "ticket_id": ticket_id,
+            "numbers": sorted(numbers),
+            "draw_id": draw_id
+        }
+    
+    def get_user_lottery_tickets(self, user_id: int, draw_id: str = None) -> List[Dict]:
+        """Get user's lottery tickets, optionally filtered by draw."""
+        import json
+        
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        if draw_id:
+            cursor.execute("""
+                SELECT * FROM lottery_tickets WHERE user_id = ? AND draw_id = ?
+                ORDER BY purchased_at DESC
+            """, (user_id, draw_id))
+        else:
+            cursor.execute("""
+                SELECT * FROM lottery_tickets WHERE user_id = ?
+                ORDER BY purchased_at DESC LIMIT 100
+            """, (user_id,))
+        
+        tickets = []
+        for row in cursor.fetchall():
+            ticket = dict(row)
+            ticket["numbers"] = json.loads(ticket["numbers"])
+            tickets.append(ticket)
+        
+        return tickets
+    
+    def get_user_ticket_count(self, user_id: int, draw_id: str) -> int:
+        """Get number of tickets a user has for a specific draw."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM lottery_tickets 
+            WHERE user_id = ? AND draw_id = ?
+        """, (user_id, draw_id))
+        
+        return cursor.fetchone()["count"]
+    
+    def get_all_tickets_for_draw(self, draw_id: str) -> List[Dict]:
+        """Get all tickets for a specific draw."""
+        import json
+        
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT lt.*, u.username 
+            FROM lottery_tickets lt
+            JOIN users u ON lt.user_id = u.id
+            WHERE lt.draw_id = ?
+        """, (draw_id,))
+        
+        tickets = []
+        for row in cursor.fetchall():
+            ticket = dict(row)
+            ticket["numbers"] = json.loads(ticket["numbers"])
+            tickets.append(ticket)
+        
+        return tickets
+    
+    def create_lottery_draw(self, draw_id: str) -> Dict:
+        """Create a new lottery draw record."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        jackpot = self.get_lottery_jackpot()
+        
+        cursor.execute("""
+            INSERT OR IGNORE INTO lottery_draws (draw_id, jackpot_amount, status)
+            VALUES (?, ?, 'pending')
+        """, (draw_id, jackpot["current_amount"]))
+        conn.commit()
+        
+        return {"draw_id": draw_id, "jackpot": jackpot["current_amount"]}
+    
+    def record_lottery_draw(self, draw_id: str, winning_numbers: List[int], 
+                           winners: List[Dict], jackpot_amount: float,
+                           no_winner_streak: int = 0) -> Dict:
+        """Record completed lottery draw results."""
+        import json
+        
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE lottery_draws
+            SET draw_date = ?, winning_numbers = ?, winners = ?, 
+                jackpot_amount = ?, status = 'completed', no_winner_streak = ?
+            WHERE draw_id = ?
+        """, (
+            datetime.now().isoformat(),
+            json.dumps(winning_numbers),
+            json.dumps(winners),
+            jackpot_amount,
+            no_winner_streak,
+            draw_id
+        ))
+        conn.commit()
+        
+        return {"success": True, "draw_id": draw_id}
+    
+    def get_lottery_draw(self, draw_id: str) -> Optional[Dict]:
+        """Get lottery draw info."""
+        import json
+        
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM lottery_draws WHERE draw_id = ?", (draw_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return None
+        
+        draw = dict(row)
+        if draw["winning_numbers"]:
+            draw["winning_numbers"] = json.loads(draw["winning_numbers"])
+        if draw["winners"]:
+            draw["winners"] = json.loads(draw["winners"])
+        
+        return draw
+    
+    def get_lottery_history(self, limit: int = 12) -> List[Dict]:
+        """Get past lottery draws."""
+        import json
+        
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM lottery_draws 
+            WHERE status = 'completed'
+            ORDER BY draw_date DESC LIMIT ?
+        """, (limit,))
+        
+        draws = []
+        for row in cursor.fetchall():
+            draw = dict(row)
+            if draw["winning_numbers"]:
+                draw["winning_numbers"] = json.loads(draw["winning_numbers"])
+            if draw["winners"]:
+                draw["winners"] = json.loads(draw["winners"])
+            draws.append(draw)
+        
+        return draws
+    
+    def create_lottery_installment(self, user_id: int, draw_id: str, 
+                                   total_amount: float, num_payments: int) -> Dict:
+        """Create installment payment plan for lottery winner."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        per_payment = total_amount / num_payments
+        
+        # Calculate next payment date (next Mon, Wed, or Fri at noon)
+        now = datetime.now()
+        days_ahead = {0: 0, 1: 1, 2: 0, 3: 1, 4: 0, 5: 2, 6: 1}  # Map to next M/W/F
+        next_day = (now.weekday() + days_ahead.get(now.weekday(), 0)) % 7
+        if next_day <= now.weekday():
+            next_day += 7
+        next_payment = now + timedelta(days=next_day - now.weekday())
+        next_payment = next_payment.replace(hour=12, minute=0, second=0, microsecond=0)
+        
+        cursor.execute("""
+            INSERT INTO lottery_installments 
+            (user_id, draw_id, total_amount, per_payment, payments_remaining, next_payment_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (user_id, draw_id, total_amount, per_payment, num_payments, next_payment.isoformat()))
+        conn.commit()
+        
+        return {
+            "success": True,
+            "installment_id": cursor.lastrowid,
+            "total_amount": total_amount,
+            "per_payment": round(per_payment, 2),
+            "payments_remaining": num_payments,
+            "next_payment_date": next_payment.isoformat()
+        }
+    
+    def get_pending_installments(self) -> List[Dict]:
+        """Get all installments due for payment."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        now = datetime.now().isoformat()
+        
+        cursor.execute("""
+            SELECT li.*, u.username 
+            FROM lottery_installments li
+            JOIN users u ON li.user_id = u.id
+            WHERE li.payments_remaining > 0 AND li.next_payment_date <= ?
+        """, (now,))
+        
+        return [dict(row) for row in cursor.fetchall()]
+    
+    def process_installment_payment(self, installment_id: int) -> Dict:
+        """Process a single installment payment."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM lottery_installments WHERE id = ?", (installment_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return {"success": False, "error": "Installment not found"}
+        
+        installment = dict(row)
+        
+        if installment["payments_remaining"] <= 0:
+            return {"success": False, "error": "No payments remaining"}
+        
+        # Pay the user
+        self.update_balance(installment["user_id"], cash_delta=installment["per_payment"])
+        
+        # Update installment record
+        new_paid = installment["paid_amount"] + installment["per_payment"]
+        new_remaining = installment["payments_remaining"] - 1
+        
+        # Calculate next payment date
+        now = datetime.now()
+        days_ahead = {0: 2, 1: 1, 2: 2, 3: 1, 4: 3, 5: 2, 6: 1}  # Days to next M/W/F
+        next_payment = now + timedelta(days=days_ahead.get(now.weekday(), 1))
+        next_payment = next_payment.replace(hour=12, minute=0, second=0, microsecond=0)
+        
+        cursor.execute("""
+            UPDATE lottery_installments
+            SET paid_amount = ?, payments_remaining = ?, next_payment_date = ?
+            WHERE id = ?
+        """, (new_paid, new_remaining, next_payment.isoformat() if new_remaining > 0 else None, installment_id))
+        conn.commit()
+        
+        # Log transaction
+        self.log_transaction(
+            installment["user_id"], "lottery_installment", 
+            installment["per_payment"], 
+            self.get_balance(installment["user_id"])["cash"],
+            game="lottery", currency="cash",
+            details=f"Installment payment {installment['payments_remaining'] - new_remaining} of {installment['payments_remaining']}"
+        )
+        
+        logger.info(f"Processed lottery installment #{installment_id} for user {installment['user_id']}: ${installment['per_payment']}")
+        
+        return {
+            "success": True,
+            "amount_paid": installment["per_payment"],
+            "payments_remaining": new_remaining,
+            "user_id": installment["user_id"]
+        }
+    
+    def get_user_installments(self, user_id: int) -> List[Dict]:
+        """Get user's lottery installment plans."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM lottery_installments WHERE user_id = ?
+            ORDER BY created_at DESC
+        """, (user_id,))
+        
+        return [dict(row) for row in cursor.fetchall()]
+    
+    def create_coin_flip_request(self, draw_id: str, user1_id: int, user2_id: int, 
+                                  hours_to_agree: int = 24) -> Dict:
+        """Create a coin flip request for multiple lottery winners."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        expires_at = (datetime.now() + timedelta(hours=hours_to_agree)).isoformat()
+        
+        cursor.execute("""
+            INSERT INTO lottery_coin_flips (draw_id, user1_id, user2_id, expires_at)
+            VALUES (?, ?, ?, ?)
+        """, (draw_id, user1_id, user2_id, expires_at))
+        conn.commit()
+        
+        return {
+            "request_id": cursor.lastrowid,
+            "draw_id": draw_id,
+            "user1_id": user1_id,
+            "user2_id": user2_id,
+            "expires_at": expires_at
+        }
+    
+    def respond_to_coin_flip(self, request_id: int, user_id: int, agreed: bool) -> Dict:
+        """User responds to coin flip request."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM lottery_coin_flips WHERE id = ?", (request_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return {"success": False, "error": "Request not found"}
+        
+        request = dict(row)
+        
+        if request["status"] != "pending":
+            return {"success": False, "error": "Request already resolved"}
+        
+        # Check if expired
+        if datetime.now() > datetime.fromisoformat(request["expires_at"]):
+            cursor.execute("UPDATE lottery_coin_flips SET status = 'expired' WHERE id = ?", (request_id,))
+            conn.commit()
+            return {"success": False, "error": "Request expired"}
+        
+        # Update agreement
+        if user_id == request["user1_id"]:
+            cursor.execute("UPDATE lottery_coin_flips SET user1_agreed = ? WHERE id = ?", 
+                          (1 if agreed else -1, request_id))
+        elif user_id == request["user2_id"]:
+            cursor.execute("UPDATE lottery_coin_flips SET user2_agreed = ? WHERE id = ?", 
+                          (1 if agreed else -1, request_id))
+        else:
+            return {"success": False, "error": "User not part of this request"}
+        
+        conn.commit()
+        
+        # Check if both have responded
+        cursor.execute("SELECT * FROM lottery_coin_flips WHERE id = ?", (request_id,))
+        updated = dict(cursor.fetchone())
+        
+        if updated["user1_agreed"] != 0 and updated["user2_agreed"] != 0:
+            # Both responded
+            if updated["user1_agreed"] == 1 and updated["user2_agreed"] == 1:
+                # Both agreed - execute coin flip
+                from app.core.rng import rng
+                winner_id = updated["user1_id"] if rng.random_float() < 0.5 else updated["user2_id"]
+                cursor.execute("""
+                    UPDATE lottery_coin_flips SET status = 'completed', winner_id = ? WHERE id = ?
+                """, (winner_id, request_id))
+                conn.commit()
+                
+                logger.info(f"Coin flip #{request_id} executed. Winner: user {winner_id}")
+                return {"success": True, "status": "completed", "winner_id": winner_id}
+            else:
+                # Someone declined - split the prize
+                cursor.execute("UPDATE lottery_coin_flips SET status = 'declined' WHERE id = ?", (request_id,))
+                conn.commit()
+                return {"success": True, "status": "declined", "message": "Prize will be split 50/50"}
+        
+        return {"success": True, "status": "pending", "message": "Waiting for other user"}
+    
+    def get_coin_flip_status(self, user_id: int) -> Optional[Dict]:
+        """Get pending coin flip request for a user."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM lottery_coin_flips 
+            WHERE (user1_id = ? OR user2_id = ?) AND status = 'pending'
+            ORDER BY created_at DESC LIMIT 1
+        """, (user_id, user_id))
+        
+        row = cursor.fetchone()
+        return dict(row) if row else None
 
 
 # Singleton instance
 db = Database()
+

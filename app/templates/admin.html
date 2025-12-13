@@ -12,6 +12,7 @@
         <button class="admin-tab active" onclick="showAdminTab('overview')">📊 Overview</button>
         <button class="admin-tab" onclick="showAdminTab('users')">👥 Users</button>
         <button class="admin-tab" onclick="showAdminTab('odds')">🎲 Odds</button>
+        <button class="admin-tab" onclick="showAdminTab('lottery')">🎫 Lottery</button>
         <button class="admin-tab" onclick="showAdminTab('logs')">📋 Logs</button>
     </div>
 
@@ -187,6 +188,34 @@
                 <button onclick="saveOdds()" class="admin-btn save">💾 Save Odds</button>
                 <button onclick="reloadOdds()" class="admin-btn">🔄 Reload from File</button>
                 <span id="odds-status" class="status-message"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lottery Tab -->
+    <div id="lottery-tab" class="admin-tab-content">
+        <div class="admin-card wide">
+            <h3>🎫 Lottery Management</h3>
+
+            <div class="admin-grid">
+                <!-- Jackpot Control -->
+                <div class="admin-card">
+                    <h4>💰 Jackpot Control</h4>
+                    <p>Current Jackpot: <strong id="current-jackpot-display">Loading...</strong></p>
+                    <div class="form-group">
+                        <label>Set New Amount</label>
+                        <input type="number" id="new-jackpot-amount" placeholder="0.00" step="100">
+                    </div>
+                    <button onclick="setJackpot()" class="admin-btn save">Set Jackpot</button>
+                </div>
+
+                <!-- Draw Control -->
+                <div class="admin-card">
+                    <h4>🎯 Draw Control</h4>
+                    <p>Manually trigger a lottery draw immediately.</p>
+                    <button onclick="forceDraw()" class="admin-btn danger">⚠️ FORCE DRAW NOW</button>
+                    <div id="draw-status" class="status-message"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -371,6 +400,44 @@
         if (data.success) {
             document.getElementById('odds-editor').value = JSON.stringify(data.odds, null, 2);
             document.getElementById('odds-status').textContent = '✅ Reloaded from file';
+        }
+    }
+
+    // Lottery Management
+    async function setJackpot() {
+        const amount = parseFloat(document.getElementById('new-jackpot-amount').value);
+        if (!amount || amount < 0) return alert("Invalid amount");
+
+        const response = await fetch('/admin/api/lottery/set-jackpot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            alert(`Jackpot updated to $${data.jackpot.current_amount}`);
+            document.getElementById('new-jackpot-amount').value = '';
+        } else {
+            alert("Error: " + data.error);
+        }
+    }
+
+    async function forceDraw() {
+        if (!confirm("Are you sure you want to FORCE a lottery draw right now?")) return;
+
+        const status = document.getElementById('draw-status');
+        status.textContent = "Processing...";
+
+        const response = await fetch('/api/games/lottery/draw-admin', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.success) {
+            status.textContent = `✅ Draw Complete! Winners: ${data.winners}`;
+            status.className = 'status-message success';
+        } else {
+            status.textContent = "❌ " + (data.detail || "Error");
+            status.className = 'status-message error';
         }
     }
 

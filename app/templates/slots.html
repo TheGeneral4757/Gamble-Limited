@@ -2,146 +2,258 @@
 
 {% block content %}
 <div class="game-container slots-game">
+    <!-- Premium Game Header -->
     <div class="game-header">
-        <h2>🎰 Slots</h2>
-        <a href="/" class="back-link">← Back to Lobby</a>
+        <div class="header-left">
+            <a href="/" class="back-link">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                BACK
+            </a>
+        </div>
+        <div class="header-center">
+            <h2><span class="pulse-icon">🎰</span> SLOTS</h2>
+        </div>
+        <div class="header-right">
+            <div class="balance-pill">
+                <span class="label">CREDITS</span>
+                <span class="value" id="game-balance">---</span>
+            </div>
+        </div>
     </div>
 
     <div class="game-area">
-        <div class="slots-machine">
-            <div class="slots-display">
-                <div class="reel" id="reel-0">
-                    <span class="symbol">🍒</span>
-                </div>
+        <div class="slot-machine">
+            <div class="reels-container">
                 <div class="reel" id="reel-1">
-                    <span class="symbol">🍋</span>
+                    <div class="symbol">7️⃣</div>
                 </div>
                 <div class="reel" id="reel-2">
-                    <span class="symbol">🍊</span>
+                    <div class="symbol">7️⃣</div>
+                </div>
+                <div class="reel" id="reel-3">
+                    <div class="symbol">7️⃣</div>
                 </div>
             </div>
-            <div class="slots-info">
-                <div id="result-message" class="result-message"></div>
+
+            <div class="win-display" id="win-display">
+                <div class="win-text">GOOD LUCK!</div>
             </div>
         </div>
     </div>
 
     <div class="game-controls">
         <div class="bet-controls">
-            <label>Bet Amount</label>
-            <div class="bet-input-group">
-                <button class="bet-adjust" onclick="adjustBet(-10); playSound('click');">-</button>
+            <label>BET AMOUNT</label>
+            <div class="bet-input-wrapper">
+                <button class="bet-adjust" onclick="adjustBet(-5); playSound('click');">-</button>
                 <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
-                <button class="bet-adjust" onclick="adjustBet(10); playSound('click');">+</button>
+                <button class="bet-adjust" onclick="adjustBet(5); playSound('click');">+</button>
             </div>
-            <span class="bet-limits">Min: {{ min_bet }} | Max: {{ max_bet }}</span>
+            <div class="bet-quick-actions">
+                <button class="quick-bet-btn" onclick="setBet({{ min_bet }})">MIN</button>
+                <button class="quick-bet-btn" onclick="setBet({{ max_bet }})">MAX</button>
+            </div>
         </div>
         <button class="action-btn spin-btn" id="spin-btn" onclick="spin()">
-            🎰 SPIN
+            <span class="btn-icon">🎰</span> SPIN
         </button>
     </div>
 
-    <div class="paytable">
-        <h3>Paytable</h3>
-        <div class="paytable-grid">
-            <div class="payout-row"><span>🍒🍒🍒</span><span>3x</span></div>
-            <div class="payout-row"><span>🍋🍋🍋</span><span>5x</span></div>
-            <div class="payout-row"><span>🍊🍊🍊</span><span>8x</span></div>
-            <div class="payout-row"><span>🍇🍇🍇</span><span>12x</span></div>
-            <div class="payout-row"><span>🔔🔔🔔</span><span>20x</span></div>
-            <div class="payout-row"><span>💎💎💎</span><span>40x</span></div>
-            <div class="payout-row jackpot"><span>7️⃣7️⃣7️⃣</span><span>77x</span></div>
-            <div class="payout-row"><span>2 Adjacent Match</span><span>1-15x</span></div>
+    <div class="payout-info">
+        <h3>PAYOUTS</h3>
+        <div class="payout-grid">
+            <div class="payout-item">
+                <span class="symbols">7️⃣ 7️⃣ 7️⃣</span>
+                <span class="multiplier">50x</span>
+            </div>
+            <div class="payout-item">
+                <span class="symbols">💎 💎 💎</span>
+                <span class="multiplier">25x</span>
+            </div>
+            <div class="payout-item">
+                <span class="symbols">🔔 🔔 🔔</span>
+                <span class="multiplier">15x</span>
+            </div>
+            <div class="payout-item">
+                <span class="symbols">🍇 🍇 🍇</span>
+                <span class="multiplier">10x</span>
+            </div>
+            <div class="payout-item">
+                <span class="symbols">🍊 🍊 🍊</span>
+                <span class="multiplier">5x</span>
+            </div>
+            <div class="payout-item">
+                <span class="symbols">🍒 🍒 🍒</span>
+                <span class="multiplier">3x</span>
+            </div>
+            <div class="payout-item">
+                <span class="symbols">Any 🍒 🍒</span>
+                <span class="multiplier">2x</span>
+            </div>
         </div>
     </div>
+
+    <style>
+        /* Quick Actions & Balance Pill */
+        .bet-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .bet-quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .quick-bet-btn {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: var(--text-dim);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-bet-btn:hover {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .balance-pill {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            min-width: 100px;
+        }
+
+        .balance-pill .label {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .balance-pill .value {
+            font-size: 1.1rem;
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            line-height: 1;
+        }
+    </style>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '7️⃣'];
     let isSpinning = false;
+
+    // Init balance display
+    document.addEventListener('DOMContentLoaded', () => {
+        const globalBal = document.getElementById('credits-balance');
+        const gameBal = document.getElementById('game-balance');
+        if (globalBal && gameBal) {
+            gameBal.textContent = globalBal.textContent;
+            const observer = new MutationObserver(() => { gameBal.textContent = globalBal.textContent; });
+            observer.observe(globalBal, { childList: true, characterData: true, subtree: true });
+        }
+    });
 
     function adjustBet(amount) {
         const input = document.getElementById('bet-amount');
-        const newValue = Math.max({{ min_bet }}, Math.min({{ max_bet }}, parseInt(input.value || 0) + amount));
-    input.value = newValue;
-}
+        let val = parseInt(input.value || 0) + amount;
+        setBet(val);
+    }
+
+    function setBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const min = {{ min_bet }};
+    const max = {{ max_bet }};
+    input.value = Math.max(min, Math.min(max, amount));
+    }
 
     async function spin() {
         if (isSpinning) return;
 
         const bet = parseFloat(document.getElementById('bet-amount').value);
         const spinBtn = document.getElementById('spin-btn');
-        const resultMsg = document.getElementById('result-message');
+        const winDisplay = document.getElementById('win-display');
 
         isSpinning = true;
         spinBtn.disabled = true;
-        spinBtn.textContent = '🎰 SPINNING...';
-        resultMsg.textContent = '';
-        resultMsg.className = 'result-message';
+        spinBtn.classList.add('disabled');
+        spinBtn.textContent = 'SPINNING...';
+        winDisplay.innerHTML = '<div class="win-text">...</div>';
+        winDisplay.className = 'win-display';
 
-        // Play spin sound
-        playSound('spin');
-
-        // Animate reels
-        const reels = [0, 1, 2].map(i => document.getElementById(`reel-${i}`));
-        reels.forEach(reel => reel.classList.add('spinning'));
+        // Start animation
+        document.querySelectorAll('.reel').forEach(reel => reel.classList.add('spinning'));
+        playSound('wheelSpin');
 
         try {
             const response = await fetch('/api/games/slots/spin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ bet })
+                body: JSON.stringify({ bet: bet })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.detail || 'Spin failed');
+                let msg = data.detail || 'Spin failed';
+                if (Array.isArray(msg)) msg = msg.map(e => e.msg).join(', ');
+                else if (typeof msg === 'object') msg = JSON.stringify(msg);
+                throw new Error(msg);
             }
 
-            // Stop reels one by one with delay and sound
-            for (let i = 0; i < 3; i++) {
-                await new Promise(r => setTimeout(r, 300 + i * 200));
-                reels[i].classList.remove('spinning');
-                reels[i].querySelector('.symbol').textContent = data.reels[i];
-                playSound('reelStop');
-            }
+            // Stop animation after delay
+            await new Promise(r => setTimeout(r, 1000));
 
-            // Show result
-            await new Promise(r => setTimeout(r, 300));
+            document.querySelectorAll('.reel').forEach((reel, index) => {
+                reel.classList.remove('spinning');
+                const symbolDiv = reel.querySelector('.symbol');
+                symbolDiv.textContent = data.reels[index];
+                // Add bounce animation
+                symbolDiv.style.animation = 'none';
+                symbolDiv.offsetHeight; /* trigger reflow */
+                symbolDiv.style.animation = 'bounce 0.5s ease';
+            });
+
+            playSound('ballLand');
 
             if (data.win) {
-                resultMsg.textContent = `🎉 ${data.win_type.toUpperCase()}! +${data.payout} CR (${data.multiplier}x)`;
-                resultMsg.classList.add('win');
-
-                if (data.is_jackpot) {
-                    resultMsg.classList.add('jackpot');
-                    playSound('bigWin');
-                    document.querySelector('.slots-machine').classList.add('jackpot-animation');
-                    setTimeout(() => document.querySelector('.slots-machine').classList.remove('jackpot-animation'), 2000);
-                } else {
-                    playSound('win');
-                }
+                winDisplay.innerHTML = `
+                    <div class="win-text">WINNER!</div>
+                    <div class="win-amount">+${data.payout} CREDITS</div>
+                `;
+                winDisplay.classList.add('win');
+                playSound('win');
             } else {
-                resultMsg.textContent = 'No win - Try again!';
-                resultMsg.classList.add('lose');
+                winDisplay.innerHTML = '<div class="win-text">TRY AGAIN</div>';
                 playSound('lose');
             }
 
-            // Update balance
             updateBalance(data.balance);
 
         } catch (error) {
-            resultMsg.textContent = '❌ ' + error.message;
-            resultMsg.classList.add('error');
+            winDisplay.innerText = 'Error: ' + error.message;
+            winDisplay.classList.add('lose');
             playSound('error');
-            reels.forEach(reel => reel.classList.remove('spinning'));
         }
 
         isSpinning = false;
         spinBtn.disabled = false;
+        spinBtn.classList.remove('disabled');
         spinBtn.textContent = '🎰 SPIN';
     }
 </script>

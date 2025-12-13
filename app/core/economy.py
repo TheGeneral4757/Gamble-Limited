@@ -30,17 +30,17 @@ class MarketState:
         self.price_history = []  # Last 10 rates
         
     def _trigger_random_event(self):
-        """Randomly trigger market events (5% chance per update)."""
-        if random.random() < 0.05 and not self.event_active:
+        """Randomly trigger market events (10% chance per update)."""
+        if random.random() < 0.10 and not self.event_active:
             event_types = [
-                ("boom", 1.2, 1.5),      # 20-50% rate increase
-                ("crash", 0.6, 0.85),     # 15-40% rate decrease
-                ("stable", 0.95, 1.05),   # Very stable period
-                ("volatile", 0.7, 1.4),   # Wild swings
+                ("boom", 1.5, 2.5),      # 50-150% rate increase
+                ("crash", 0.3, 0.6),     # 40-70% rate decrease
+                ("stable", 0.98, 1.02),   # Stable period
+                ("volatile", 0.5, 2.0),   # Extreme swings
             ]
             self.event_type, self.event_min, self.event_max = random.choice(event_types)
             self.event_active = True
-            self.event_end_time = time.time() + random.randint(60, 300)  # 1-5 minutes
+            self.event_end_time = time.time() + random.randint(30, 180)  # 30s-3mins
             return True
         return False
     
@@ -53,8 +53,8 @@ class MarketState:
             self.event_active = False
             self.event_type = None
         
-        # Update every 10 seconds for more dynamic feel
-        if current_time - self.last_update < 10:
+        # Update every 5 seconds for more dynamic feel
+        if current_time - self.last_update < 5:
             return self.current_rate
         
         self.last_update = current_time
@@ -68,37 +68,44 @@ class MarketState:
             event_mult = random.uniform(self.event_min, self.event_max)
             target_rate = self.base_rate * event_mult
         else:
-            # Normal market behavior with larger swings
-            # Update trend with some momentum
-            self.trend += random.uniform(-0.3, 0.3)
+            # Normal market behavior with aggressive swings
+            # Update trend with strong momentum
+            self.trend += random.uniform(-0.5, 0.5)
             self.trend = max(-1, min(1, self.trend))  # Clamp
             
-            # Base change: ±15% normal fluctuation
-            base_change = random.uniform(-0.15, 0.15)
+            # Base change: ±25% normal fluctuation
+            base_change = random.uniform(-0.25, 0.25)
             
             # Apply trend influence
-            trend_change = self.trend * 0.08
+            trend_change = self.trend * 0.15
             
             # Sinusoidal pattern for more natural fluctuation
-            time_factor = math.sin(current_time / 120) * 0.05
+            time_factor = math.sin(current_time / 60) * 0.1
             
             total_change = base_change + trend_change + time_factor
             target_rate = self.base_rate * (1 + total_change)
         
-        # Smooth transition to new rate (don't jump too quickly)
+        # Fast transition to new rate
         rate_diff = target_rate - self.current_rate
-        self.current_rate += rate_diff * 0.3  # Move 30% toward target
+        self.current_rate += rate_diff * 0.5  # Move 50% toward target
         
-        # Clamp to reasonable bounds (40% - 200% of base)
-        self.current_rate = max(self.base_rate * 0.4, 
-                                min(self.base_rate * 2.0, self.current_rate))
+        # Clamp to reasonable bounds (10% - 500% of base)
+        self.current_rate = max(self.base_rate * 0.1, 
+                                min(self.base_rate * 5.0, self.current_rate))
         
         # Track history
         self.price_history.append(round(self.current_rate, 2))
-        if len(self.price_history) > 10:
+        if len(self.price_history) > 20:
             self.price_history.pop(0)
         
         return self.current_rate
+    
+    def reset_to_baseline(self):
+        """Force reset rate to baseline (Weekly Reset)."""
+        self.current_rate = self.base_rate
+        self.trend = 0
+        self.event_active = False
+        self.price_history.append(self.base_rate)
     
     def get_rate_info(self) -> dict:
         """Get detailed rate information for display."""
@@ -108,7 +115,7 @@ class MarketState:
             "trend": "rising" if self.trend > 0.2 else "falling" if self.trend < -0.2 else "stable",
             "event_active": self.event_active,
             "event_type": self.event_type,
-            "history": self.price_history[-5:],  # Last 5 rates
+            "history": self.price_history,
         }
 
 
@@ -122,8 +129,8 @@ class EconomySystem:
     def __init__(self):
         self._base_rate = settings.economy.base_exchange_rate
     
-    def get_current_exchange_rate(self, user_id: int = None) -> float:
-        """Get current exchange rate with user-specific adjustments."""
+    def get_current_exchange_rate(self) -> float:
+        """Get current global exchange rate."""
         # Get global market rate
         rate = market.update_rate()
         
@@ -131,19 +138,13 @@ class EconomySystem:
         if is_gamble_friday():
             rate *= 1.1
         
-        # Apply user-specific penalty if converting too much
-        if user_id:
-            penalty = db.get_conversion_penalty(user_id)
-            rate = rate * (1 - penalty)  # Worse rate for frequent converters
-        
         return round(rate, 2)
     
-    def get_rate_info(self, user_id: int = None) -> dict:
+    def get_rate_info(self) -> dict:
         """Get detailed rate info for UI."""
         info = market.get_rate_info()
         info["friday_bonus"] = is_gamble_friday()
-        if user_id:
-            info["personal_rate"] = self.get_current_exchange_rate(user_id)
+        info["global_rate"] = self.get_current_exchange_rate()
         return info
     
     def get_balance(self, user_id: int) -> dict:
@@ -180,7 +181,7 @@ class EconomySystem:
     
     def do_exchange(self, user_id: int, from_currency: str, amount: float) -> dict:
         """Exchange between cash and credits with dynamic rate."""
-        rate = self.get_current_exchange_rate(user_id)
+        rate = self.get_current_exchange_rate()
         balance = self.get_balance(user_id)
         
         if from_currency == "cash":

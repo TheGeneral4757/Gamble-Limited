@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Data & Config
+data/
+*.db
+.env
+.env.*
+config.json
+docker-compose.override.yml
+*.pem
+*.key
+*.crt
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Misc
+*.log
+.DS_Store
+manage.sh
+README.md
+LICENSE
+tests/

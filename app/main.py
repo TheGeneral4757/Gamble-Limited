@@ -102,6 +102,13 @@ app.include_router(pages.router)
 app.include_router(api.router, prefix="/api")
 app.include_router(admin.router, prefix="/admin")
 
+# Start Lottery Scheduler
+from app.core.scheduler import lottery_scheduler
+
+@app.on_event("shutdown")
+def shutdown_event():
+    lottery_scheduler.shutdown()
+
 logger.info(f"Application '{settings.server.name}' initialized")
 logger.info(f"Debug mode: {settings.server.debug}")
 logger.info(f"Admin login path: {settings.security.admin_login_path}")

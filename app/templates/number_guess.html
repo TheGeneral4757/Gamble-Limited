@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container number-guess-game">
+    <!-- Premium Game Header -->
+    <div class="game-header">
+        <div class="header-left">
+            <a href="/" class="back-link">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                BACK
+            </a>
+        </div>
+        <div class="header-center">
+            <h2><span class="pulse-icon">🔢</span> NUMBER GUESS</h2>
+        </div>
+        <div class="header-right">
+            <div class="balance-pill">
+                <span class="label">CREDITS</span>
+                <span class="value" id="game-balance">---</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="guess-display">
+            <div class="target-number" id="target-number">?</div>
+            <div class="target-label">Secret Number (1-100)</div>
+        </div>
+
+        <div class="guess-input-area">
+            <div class="number-slider">
+                <input type="range" id="guess-slider" min="1" max="100" value="50" oninput="updateGuessDisplay()">
+                <div class="slider-labels">
+                    <span>1</span>
+                    <span>25</span>
+                    <span>50</span>
+                    <span>75</span>
+                    <span>100</span>
+                </div>
+            </div>
+            <div class="guess-number-display">
+                <span class="guess-label">Your Guess:</span>
+                <input type="number" id="guess-input" value="50" min="1" max="100" onchange="updateSlider()">
+            </div>
+        </div>
+
+        <div id="game-result" class="game-result"></div>
+    </div>
+
+    <div class="payout-table">
+        <h4>Payout Table</h4>
+        <div class="payout-items">
+            <div class="payout-item exact">
+                <span class="distance">EXACT</span>
+                <span class="multiplier">50x</span>
+            </div>
+            <div class="payout-item">
+                <span class="distance">±1</span>
+                <span class="multiplier">10x</span>
+            </div>
+            <div class="payout-item">
+                <span class="distance">±2-5</span>
+                <span class="multiplier">5x</span>
+            </div>
+            <div class="payout-item">
+                <span class="distance">±6-10</span>
+                <span class="multiplier">2x</span>
+            </div>
+            <div class="payout-item">
+                <span class="distance">±11-20</span>
+                <span class="multiplier">1x</span>
+            </div>
+            <div class="payout-item lose">
+                <span class="distance">±21+</span>
+                <span class="multiplier">0x</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-controls">
+        <div class="bet-controls">
+            <label>BET AMOUNT</label>
+            <div class="bet-input-wrapper">
+                <button class="bet-adjust" onclick="adjustBet(-5); playSound('click');">-</button>
+                <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                <button class="bet-adjust" onclick="adjustBet(5); playSound('click');">+</button>
+            </div>
+            <div class="bet-quick-actions">
+                <button class="quick-bet-btn" onclick="setBet({{ min_bet }})">MIN</button>
+                <button class="quick-bet-btn" onclick="setBet({{ max_bet }})">MAX</button>
+            </div>
+        </div>
+        <button class="action-btn guess-btn" id="guess-btn" onclick="makeGuess()">
+            <span class="btn-icon">🎯</span> GUESS
+        </button>
+    </div>
+
+    <style>
+        /* Quick Actions & Balance Pill (Copied from Slots) */
+        .bet-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .bet-quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .quick-bet-btn {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: var(--text-dim);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-bet-btn:hover {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .balance-pill {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            min-width: 100px;
+        }
+
+        .balance-pill .label {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .balance-pill .value {
+            font-size: 1.1rem;
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            line-height: 1;
+        }
+    </style>
+</div>
+
+<style>
+    .number-guess-game .guess-display {
+        text-align: center;
+        margin: 30px 0;
+    }
+
+    .target-number {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto;
+        background: linear-gradient(145deg, #667eea, #764ba2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        font-weight: bold;
+        color: #fff;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        transition: all 0.5s ease;
+    }
+
+    .target-number.revealed {
+        transform: scale(1.1);
+    }
+
+    .target-number.hot {
+        background: linear-gradient(145deg, #f44336, #ff5722);
+        animation: pulse 0.5s ease infinite alternate;
+    }
+
+    .target-number.warm {
+        background: linear-gradient(145deg, #ff9800, #ffc107);
+    }
+
+    .target-number.cold {
+        background: linear-gradient(145deg, #2196F3, #03A9F4);
+    }
+
+    .target-number.exact {
+        background: linear-gradient(145deg, #4CAF50, #8BC34A);
+        box-shadow: 0 0 50px rgba(76, 175, 80, 0.7);
+    }
+
+    @keyframes pulse {
+        from {
+            box-shadow: 0 0 20px rgba(244, 67, 54, 0.5);
+        }
+
+        to {
+            box-shadow: 0 0 40px rgba(244, 67, 54, 0.8);
+        }
+    }
+
+    .target-label {
+        margin-top: 15px;
+        opacity: 0.7;
+    }
+
+    .guess-input-area {
+        max-width: 400px;
+        margin: 30px auto;
+    }
+
+    .number-slider {
+        margin-bottom: 20px;
+    }
+
+    .number-slider input[type="range"] {
+        width: 100%;
+        height: 10px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: linear-gradient(to right, #2196F3, #4CAF50, #ff9800, #f44336);
+        border-radius: 5px;
+        outline: none;
+    }
+
+    .number-slider input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 25px;
+        height: 25px;
+        background: #fff;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .slider-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 5px;
+        font-size: 0.8rem;
+        opacity: 0.5;
+    }
+
+    .guess-number-display {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+    }
+
+    .guess-number-display input {
+        width: 80px;
+        font-size: 1.5rem;
+        text-align: center;
+        padding: 10px;
+        border-radius: 8px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        background: rgba(0, 0, 0, 0.2);
+        color: #fff;
+    }
+
+    .payout-table {
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 12px;
+    }
+
+    .payout-table h4 {
+        text-align: center;
+        margin-bottom: 10px;
+        opacity: 0.7;
+    }
+
+    .payout-items {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .payout-item {
+        padding: 8px 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .payout-item .distance {
+        font-size: 0.8rem;
+        opacity: 0.7;
+    }
+
+    .payout-item .multiplier {
+        font-weight: bold;
+        color: #4CAF50;
+    }
+
+    .payout-item.exact {
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.3), rgba(139, 195, 74, 0.3));
+        border: 1px solid #4CAF50;
+    }
+
+    .payout-item.exact .multiplier {
+        color: #ffd700;
+    }
+
+    .payout-item.lose .multiplier {
+        color: #f44336;
+    }
+
+    .game-result {
+        text-align: center;
+        font-size: 1.3rem;
+        margin: 20px 0;
+        min-height: 60px;
+    }
+
+    .game-result.win {
+        color: #4CAF50;
+    }
+
+    .game-result.lose {
+        color: #f44336;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let isGuessing = false;
+
+    // Init balance display
+    document.addEventListener('DOMContentLoaded', () => {
+        const globalBal = document.getElementById('credits-balance');
+        const gameBal = document.getElementById('game-balance');
+        if (globalBal && gameBal) {
+            gameBal.textContent = globalBal.textContent;
+            const observer = new MutationObserver(() => { gameBal.textContent = globalBal.textContent; });
+            observer.observe(globalBal, { childList: true, characterData: true, subtree: true });
+        }
+    });
+
+    function adjustBet(amount) {
+        const input = document.getElementById('bet-amount');
+        let val = parseInt(input.value || 0) + amount;
+        setBet(val);
+    }
+
+    function setBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const min = {{ min_bet }};
+    const max = {{ max_bet }};
+    input.value = Math.max(min, Math.min(max, amount));
+    }
+
+    function updateGuessDisplay() {
+        const slider = document.getElementById('guess-slider');
+        document.getElementById('guess-input').value = slider.value;
+    }
+
+    function updateSlider() {
+        const input = document.getElementById('guess-input');
+        const value = Math.max(1, Math.min(100, parseInt(input.value) || 50));
+        input.value = value;
+        document.getElementById('guess-slider').value = value;
+    }
+
+    async function makeGuess() {
+        if (isGuessing) return;
+
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        const guess = parseInt(document.getElementById('guess-input').value);
+        const guessBtn = document.getElementById('guess-btn');
+        const targetEl = document.getElementById('target-number');
+        const resultEl = document.getElementById('game-result');
+
+        isGuessing = true;
+        guessBtn.disabled = true;
+        guessBtn.textContent = '🎯 GUESSING...';
+        resultEl.textContent = '';
+        resultEl.className = 'game-result';
+        targetEl.className = 'target-number';
+        targetEl.textContent = '?';
+
+        // Animate reveal
+        playSound('click');
+        await animateReveal(targetEl);
+
+        try {
+            const response = await fetch('/api/games/number-guess/guess', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bet, guess })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                let msg = data.detail || 'Guess failed';
+                if (Array.isArray(msg)) msg = msg.map(e => e.msg).join(', ');
+                else if (typeof msg === 'object') msg = JSON.stringify(msg);
+                throw new Error(msg);
+            }
+
+            // Reveal the target
+            targetEl.textContent = data.target;
+            targetEl.classList.add('revealed');
+
+            // Color based on distance
+            if (data.is_exact) {
+                targetEl.classList.add('exact');
+            } else if (data.distance <= 5) {
+                targetEl.classList.add('hot');
+            } else if (data.distance <= 15) {
+                targetEl.classList.add('warm');
+            } else {
+                targetEl.classList.add('cold');
+            }
+
+            // Show result
+            await new Promise(r => setTimeout(r, 500));
+
+            resultEl.innerHTML = `
+                <div>${data.message}</div>
+                <div style="margin-top: 10px;">
+                    Your guess: <strong>${data.guess}</strong> | 
+                    Target: <strong>${data.target}</strong> | 
+                    Distance: <strong>${data.distance}</strong>
+                </div>
+            `;
+
+            if (data.win) {
+                resultEl.innerHTML += `<div style="margin-top: 10px; font-size: 1.5rem;">🎉 ${data.multiplier}x = +${data.payout} CR</div>`;
+                resultEl.classList.add('win');
+                playSound(data.is_exact ? 'jackpot' : 'win');
+            } else {
+                resultEl.classList.add('lose');
+                playSound('lose');
+            }
+
+            updateBalance(data.balance);
+
+        } catch (error) {
+            targetEl.textContent = '❌';
+            resultEl.textContent = '❌ ' + error.message;
+            resultEl.classList.add('error');
+            playSound('error');
+        }
+
+        isGuessing = false;
+        guessBtn.disabled = false;
+        guessBtn.textContent = '🎯 GUESS';
+    }
+
+    async function animateReveal(element) {
+        const symbols = ['🔢', '❓', '🎲', '🔢', '❓'];
+        for (const sym of symbols) {
+            element.textContent = sym;
+            await new Promise(r => setTimeout(r, 150));
+        }
+    }
+
+
+</script>
+{% endblock %}

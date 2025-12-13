@@ -191,11 +191,15 @@ class BlackjackGame:
         
         # Check for bust
         if player_hand.is_bust:
-            return self._finalize_game(game_id, game, "bust", 0)
+            result = self._finalize_game(game_id, game, "bust", 0)
+            result["new_card"] = card.to_dict()
+            return result
         
         # Check for 21 (auto-stand)
         if player_hand.value == 21:
-            return self.stand(game_id, user_id)
+            result = self.stand(game_id, user_id)
+            result["new_card"] = card.to_dict()
+            return result
         
         return {
             "game_id": game_id,

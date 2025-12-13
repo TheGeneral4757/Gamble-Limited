@@ -91,6 +91,9 @@ class GameConfig(BaseModel):
     max_bet: float = 1000.0
     payout_rate: float = 0.95
 
+    class Config:
+        extra = "allow"  # Allow extra fields for game-specific configs
+
 
 class GamesConfig(BaseModel):
     slots: GameConfig = Field(default_factory=GameConfig)
@@ -98,6 +101,30 @@ class GamesConfig(BaseModel):
     roulette: GameConfig = Field(default_factory=GameConfig)
     plinko: GameConfig = Field(default_factory=GameConfig)
     coinflip: GameConfig = Field(default_factory=GameConfig)
+    scratch_cards: GameConfig = Field(default_factory=GameConfig)
+    highlow: GameConfig = Field(default_factory=GameConfig)
+    dice: GameConfig = Field(default_factory=GameConfig)
+    number_guess: GameConfig = Field(default_factory=GameConfig)
+
+
+class LotteryConfig(BaseModel):
+    """Lottery game configuration."""
+    enabled: bool = True
+    ticket_price: float = 50.0
+    max_tickets_per_user: int = 100
+    numbers_to_pick: int = 6
+    number_range_max: int = 49
+    draw_schedule: str = "first_friday"
+    draw_hour: int = 12
+    draw_minute: int = 0
+    timezone: str = "America/Chicago"
+    initial_jackpot: float = 10000.0
+    jackpot_contribution_percent: float = 70.0
+    lump_sum_percent: float = 50.0
+    installment_weeks: int = 52
+
+    class Config:
+        extra = "allow"
 
 
 class RateLimitConfig(BaseModel):
@@ -144,6 +171,7 @@ class AppConfig(BaseModel):
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     economy: EconomyConfig = Field(default_factory=EconomyConfig)
     games: GamesConfig = Field(default_factory=GamesConfig)
+    lottery: LotteryConfig = Field(default_factory=LotteryConfig)
     gamble_friday: GambleFridayConfig = Field(default_factory=GambleFridayConfig)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)

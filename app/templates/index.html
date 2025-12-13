@@ -1,73 +1,477 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="hero">
-    <h2>Welcome to the Future of Gambling</h2>
-    <p>Experience true randomness in a premium environment.</p>
-</section>
+<div class="lobby-container">
+    <!-- Hero Dashboard -->
+    <section class="hero-dashboard">
+        <div class="user-welcome">
+            {% if user %}
+            <h1>Welcome back, <span class="highlight">{{ user.username }}</span>.</h1>
+            <p>Your premium gaming session is ready.</p>
+            {% else %}
+            <h1>Welcome to {{ app_name }}</h1>
+            <p>Experience true randomness in a premium environment.</p>
+            {% endif %}
+        </div>
 
-<!-- Daily Rewards Section -->
-<section class="daily-rewards">
-    <h3>🎁 Daily Rewards</h3>
-    <div class="rewards-grid">
-        <div class="reward-card" id="daily-credits-card">
-            <div class="reward-icon">💎</div>
-            <div class="reward-info">
-                <strong>Daily Credits</strong>
-                <span>+{{ daily_bonus_credits }} CR</span>
+        {% if user %}
+        <div class="stats-row">
+            <div class="stat-box">
+                <span class="label">TOTAL WINNINGS</span>
+                <span class="value win">${{ "%.2f"|format(user_stats.total_won if user_stats else 0) }}</span>
             </div>
-            <button class="claim-btn" onclick="claimDailyReward('credits')">Claim</button>
-        </div>
-        <div class="reward-card" id="daily-cash-card">
-            <div class="reward-icon">💵</div>
-            <div class="reward-info">
-                <strong>Daily Cash</strong>
-                <span>+${{ daily_bonus_cash }}</span>
+            <div class="stat-box">
+                <span class="label">VIP STATUS</span>
+                <span class="value vip">PLATINUM</span>
             </div>
-            <button class="claim-btn" onclick="claimDailyReward('cash')">Claim</button>
+            <div class="stat-box">
+                <span class="label">NET PROFIT</span>
+                <span
+                    class="value {{ 'positive' if user_stats and (user_stats.total_won - user_stats.total_wagered) >= 0 else 'negative' }}">
+                    ${{ "%.2f"|format(user_stats.total_won - user_stats.total_wagered if user_stats else 0) }}
+                </span>
+            </div>
         </div>
-    </div>
-</section>
+        {% endif %}
+    </section>
 
-<section class="games-grid">
-    {% for game_name, game_config in games.items() %}
-    {% if game_config.enabled %}
-    <div class="game-card" onclick="window.location='/game/{{ game_name }}'">
-        <div class="game-icon">
-            <div class="icon-circle">
-                {% if game_name == 'slots' %}🎰
-                {% elif game_name == 'blackjack' %}🃏
-                {% elif game_name == 'roulette' %}🎡
-                {% elif game_name == 'plinko' %}⚪
-                {% elif game_name == 'coinflip' %}🪙
-                {% else %}{{ game_name[0]|upper }}
-                {% endif %}
+    <!-- Daily Rewards -->
+    <section class="rewards-section">
+        <div class="section-header">
+            <h3>🎁 Daily Rewards</h3>
+            <div class="divider"></div>
+        </div>
+        <div class="rewards-grid">
+            <div class="reward-card" id="daily-credits-card">
+                <div class="card-glow"></div>
+                <div class="reward-icon">💎</div>
+                <div class="reward-content">
+                    <h4>Credits Bonus</h4>
+                    <p>+{{ daily_bonus_credits }} CR</p>
+                </div>
+                <button class="claim-btn" onclick="claimDailyReward('credits')">CLAIM</button>
+            </div>
+            <div class="reward-card" id="daily-cash-card">
+                <div class="card-glow"></div>
+                <div class="reward-icon">💵</div>
+                <div class="reward-content">
+                    <h4>Cash Injection</h4>
+                    <p>+${{ daily_bonus_cash }}</p>
+                </div>
+                <button class="claim-btn" onclick="claimDailyReward('cash')">CLAIM</button>
             </div>
         </div>
-        <h3>{{ game_name|title }}</h3>
-        <p class="bet-range">Bet: {{ game_config.min_bet }} - {{ game_config.max_bet }} CR</p>
-        <a href="/game/{{ game_name }}" class="play-btn">Play Now</a>
-    </div>
+    </section>
+
+    <!-- Lottery Banner -->
+    {% if lottery_enabled %}
+    <section class="lottery-section-premium" onclick="window.location='/game/lottery'">
+        <div class="lottery-bg"></div>
+        <div class="lottery-content">
+            <div class="jackpot-label">CURRENT JACKPOT</div>
+            <div class="jackpot-value">$<span id="home-jackpot-amount">{{ lottery_jackpot }}</span></div>
+            <div class="lottery-meta">
+                <span>NEXT DRAW: {{ next_draw }}</span>
+                <span>•</span>
+                <span>PROVABLY FAIR</span>
+            </div>
+        </div>
+        <button class="play-lottery-btn">PLAY NOW</button>
+    </section>
     {% endif %}
-    {% endfor %}
-</section>
 
-<section class="info-section">
-    <div class="info-grid">
-        <div class="info-card">
-            <h3>🔒 Provably Fair</h3>
-            <p>All games use cryptographically secure random number generation.</p>
+    <!-- Games Grid -->
+    <section class="games-section">
+        <div class="section-header">
+            <h3>🎮 Games Library</h3>
+            <div class="divider"></div>
         </div>
-        <div class="info-card">
-            <h3>💎 Premium Experience</h3>
-            <p>Smooth animations and instant payouts on every win.</p>
+
+        <div class="games-grid-premium">
+            {% for game_name, game_config in games.items() %}
+            {% if game_config.enabled and game_name != 'lottery' %}
+            <div class="game-card-premium" onclick="window.location='/game/{{ game_name }}'">
+                <div class="card-image-placeholder">
+                    <span class="game-emoji">
+                        {% if game_name == 'slots' %}🎰
+                        {% elif game_name == 'blackjack' %}🃏
+                        {% elif game_name == 'roulette' %}🎡
+                        {% elif game_name == 'plinko' %}⚪
+                        {% elif game_name == 'coinflip' %}🪙
+                        {% elif game_name == 'scratch_cards' %}🎟️
+                        {% elif game_name == 'highlow' %}📊
+                        {% elif game_name == 'dice' %}🎲
+                        {% elif game_name == 'number_guess' %}🔢
+                        {% else %}🎮
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="card-details">
+                    <h4>{{ game_name|replace('_', ' ')|title }}</h4>
+                    <span class="bet-limit">MIN: {{ game_config.min_bet }} CR</span>
+                </div>
+                <div class="hover-overlay">
+                    <span class="play-text">PLAY NOW</span>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
         </div>
-        <div class="info-card">
-            <h3>📊 Live Stats</h3>
-            <p>Track your balance and transaction history in real-time.</p>
-        </div>
-    </div>
-</section>
+    </section>
+</div>
+
+<style>
+    .lobby-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    /* Hero Dashboard */
+    .hero-dashboard {
+        text-align: center;
+        margin-bottom: 3rem;
+        animation: fadeIn 0.8s ease-out;
+    }
+
+    .user-welcome h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+        letter-spacing: -1px;
+    }
+
+    .highlight {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .stats-row {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .stat-box {
+        background: var(--bg-panel);
+        border: 1px solid var(--glass-border);
+        padding: 1rem 2rem;
+        border-radius: var(--radius);
+        min-width: 150px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .stat-box .label {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        letter-spacing: 1px;
+    }
+
+    .stat-box .value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .value.vip {
+        color: var(--warning);
+    }
+
+    .value.win {
+        color: var(--success);
+    }
+
+    .value.positive {
+        color: var(--success);
+    }
+
+    .value.negative {
+        color: var(--danger);
+    }
+
+    /* Rewards */
+    .rewards-section {
+        margin-bottom: 3rem;
+    }
+
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .section-header h3 {
+        font-size: 1.2rem;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        white-space: nowrap;
+    }
+
+    .divider {
+        height: 1px;
+        background: var(--glass-border);
+        width: 100%;
+    }
+
+    .rewards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .reward-card {
+        background: var(--bg-card);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--glass-border);
+        transition: transform 0.3s;
+    }
+
+    .reward-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .card-glow {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(circle at top right, var(--primary-dim), transparent 60%);
+        pointer-events: none;
+    }
+
+    .reward-icon {
+        font-size: 2.5rem;
+        z-index: 1;
+    }
+
+    .reward-content {
+        flex: 1;
+        z-index: 1;
+    }
+
+    .reward-content h4 {
+        margin-bottom: 0.25rem;
+    }
+
+    .reward-content p {
+        color: var(--success);
+        font-weight: 600;
+    }
+
+    .claim-btn {
+        background: var(--glass);
+        border: 1px solid var(--primary);
+        color: var(--primary);
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        z-index: 1;
+        transition: all 0.2s;
+    }
+
+    .claim-btn:hover:not(:disabled) {
+        background: var(--primary);
+        color: #000;
+        box-shadow: 0 0 15px var(--primary-dim);
+    }
+
+    /* Lottery Banner Premium */
+    .lottery-section-premium {
+        background: linear-gradient(135deg, #2c0b4a, #1a052b);
+        border-radius: var(--radius);
+        padding: 2.5rem;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid rgba(255, 215, 0, 0.2);
+        margin-bottom: 3rem;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .lottery-section-premium:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        border-color: rgba(255, 215, 0, 0.5);
+    }
+
+    .lottery-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: radial-gradient(circle at 80% 50%, rgba(255, 215, 0, 0.1), transparent 50%);
+    }
+
+    .lottery-content {
+        z-index: 2;
+    }
+
+    .jackpot-label {
+        font-size: 0.9rem;
+        color: #ffd700;
+        letter-spacing: 2px;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .jackpot-value {
+        font-size: 3.5rem;
+        font-weight: 800;
+        color: #fff;
+        text-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+        font-family: 'JetBrains Mono', monospace;
+        letter-spacing: -2px;
+    }
+
+    .lottery-meta {
+        margin-top: 1rem;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .play-lottery-btn {
+        background: #ffd700;
+        color: #000;
+        border: none;
+        padding: 1rem 2rem;
+        border-radius: 30px;
+        font-weight: 800;
+        font-size: 1.1rem;
+        z-index: 2;
+        transition: transform 0.2s;
+    }
+
+    .play-lottery-btn:hover {
+        transform: scale(1.05);
+    }
+
+    /* Games Grid Premium */
+    .games-grid-premium {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .game-card-premium {
+        background: var(--bg-panel);
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 1px solid var(--glass-border);
+        cursor: pointer;
+        transition: all 0.3s;
+        position: relative;
+    }
+
+    .game-card-premium:hover {
+        transform: translateY(-8px);
+        border-color: var(--primary);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-image-placeholder {
+        height: 140px;
+        background: rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    .game-emoji {
+        font-size: 4rem;
+        filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.1));
+        transition: transform 0.3s;
+    }
+
+    .game-card-premium:hover .game-emoji {
+        transform: scale(1.2) rotate(5deg);
+    }
+
+    .card-details {
+        padding: 1.25rem;
+        border-top: 1px solid var(--glass-border);
+    }
+
+    .card-details h4 {
+        margin-bottom: 0.25rem;
+        font-size: 1.1rem;
+    }
+
+    .bet-limit {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        font-weight: 600;
+    }
+
+    .hover-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 242, 234, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .game-card-premium:hover .hover-overlay {
+        opacity: 0.1;
+        /* Subtle tint on hover instead of full cover */
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .stats-row {
+            gap: 1rem;
+        }
+
+        .stat-box {
+            flex: 1 1 40%;
+        }
+
+        .lottery-section-premium {
+            flex-direction: column;
+            text-align: center;
+            gap: 1.5rem;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}

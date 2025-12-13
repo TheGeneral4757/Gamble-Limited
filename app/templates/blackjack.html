@@ -2,114 +2,284 @@
 
 {% block content %}
 <div class="game-container blackjack-game">
+    <!-- Premium Game Header -->
     <div class="game-header">
-        <h2>🃏 Blackjack</h2>
-        <a href="/" class="back-link">← Back to Lobby</a>
+        <div class="header-left">
+            <a href="/" class="back-link">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                BACK
+            </a>
+        </div>
+        <div class="header-center">
+            <h2><span class="pulse-icon">🃏</span> BLACKJACK</h2>
+        </div>
+        <div class="header-right">
+            <div class="balance-pill">
+                <span class="label">CREDITS</span>
+                <span class="value" id="game-balance">---</span>
+            </div>
+        </div>
     </div>
 
     <div class="game-area">
-        <div class="blackjack-table">
-            <!-- Dealer Section -->
-            <div class="dealer-section">
-                <h3>Dealer <span id="dealer-value" class="hand-value"></span></h3>
-                <div class="hand" id="dealer-hand">
-                    <div class="card-placeholder">Deal to start</div>
-                </div>
-            </div>
+        <div class="dealer-area">
+            <h3>DEALER <span id="dealer-score" class="score-badge">?</span></h3>
+            <div id="dealer-cards" class="cards-container"></div>
+        </div>
 
-            <!-- Result Display -->
-            <div id="game-result" class="game-result"></div>
+        <div class="message-area" id="game-message"></div>
 
-            <!-- Player Section -->
-            <div class="player-section">
-                <h3>Your Hand <span id="player-value" class="hand-value"></span></h3>
-                <div class="hand" id="player-hand">
-                    <div class="card-placeholder">Place your bet</div>
-                </div>
-            </div>
+        <div class="player-area">
+            <h3>YOU <span id="player-score" class="score-badge">0</span></h3>
+            <div id="player-cards" class="cards-container"></div>
         </div>
     </div>
 
-    <div class="game-controls">
-        <!-- Betting Phase -->
-        <div id="betting-controls" class="controls-phase">
-            <div class="bet-controls">
-                <label>Bet Amount</label>
-                <div class="bet-input-group">
-                    <button class="bet-adjust" onclick="adjustBet(-20); playSound('click');">-</button>
-                    <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
-                    <button class="bet-adjust" onclick="adjustBet(20); playSound('click');">+</button>
-                </div>
-            </div>
-            <button class="action-btn deal-btn" onclick="deal()">🃏 DEAL</button>
-        </div>
-
-        <!-- Playing Phase -->
-        <div id="playing-controls" class="controls-phase" style="display: none;">
-            <button class="action-btn hit-btn" onclick="hit()">👆 HIT</button>
-            <button class="action-btn stand-btn" onclick="stand()">✋ STAND</button>
-        </div>
-
-        <!-- Game Over Phase -->
-        <div id="gameover-controls" class="controls-phase" style="display: none;">
-            <button class="action-btn new-game-btn" onclick="newGame()">🔄 NEW GAME</button>
-        </div>
+    <!-- Gameplay Controls (Hit/Stand) -->
+    <div class="game-controls" id="play-controls" style="display: none;">
+        <button class="action-btn hit-btn" onclick="hit()">
+            HIT
+        </button>
+        <button class="action-btn stand-btn" onclick="stand()">
+            STAND
+        </button>
     </div>
+
+    <!-- Betting Controls (Start) -->
+    <div class="game-controls" id="bet-controls">
+        <div class="bet-controls">
+            <label>BET AMOUNT</label>
+            <div class="bet-input-wrapper">
+                <button class="bet-adjust" onclick="adjustBet(-5); playSound('click');">-</button>
+                <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                <button class="bet-adjust" onclick="adjustBet(5); playSound('click');">+</button>
+            </div>
+            <div class="bet-quick-actions">
+                <button class="quick-bet-btn" onclick="setBet({{ min_bet }})">MIN</button>
+                <button class="quick-bet-btn" onclick="setBet({{ max_bet }})">MAX</button>
+            </div>
+        </div>
+        <button class="action-btn deal-btn" id="deal-btn" onclick="deal()">
+            <span class="btn-icon">🃏</span> DEAL
+        </button>
+    </div>
+
+    <style>
+        /* Blackjack Specifics */
+        .cards-container {
+            display: flex;
+            justify-content: center;
+            gap: -40px;
+            /* Overlap effect */
+            min-height: 140px;
+            margin: 20px 0;
+            perspective: 1000px;
+        }
+
+        .card {
+            width: 90px;
+            height: 130px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+            margin: 0 5px;
+            animation: dealCard 0.5s ease-out forwards;
+            transition: transform 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-10px) rotate(2deg);
+        }
+
+        .card.red {
+            color: #d32f2f;
+        }
+
+        .card.black {
+            color: #212121;
+        }
+
+        .card.hidden-card {
+            background: linear-gradient(135deg, #1a237e, #0d47a1);
+            color: transparent;
+            border: 2px solid #fff;
+        }
+
+        .card.hidden-card::after {
+            content: "Testing";
+            /* Or logo/pattern */
+            color: rgba(255, 255, 255, 0.1);
+            font-size: 0.8rem;
+            transform: rotate(-45deg);
+        }
+
+        @keyframes dealCard {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.8);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .score-badge {
+            background: var(--glass);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            margin-left: 10px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .message-area {
+            height: 40px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin: 10px 0;
+        }
+
+        .hit-btn {
+            background: linear-gradient(to right, #4CAF50, #8BC34A);
+        }
+
+        .stand-btn {
+            background: linear-gradient(to right, #f44336, #ef5350);
+        }
+
+        /* Quick Actions & Balance Pill (Copied from Slots) */
+        .bet-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .bet-quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .quick-bet-btn {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: var(--text-dim);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-bet-btn:hover {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .balance-pill {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            min-width: 100px;
+        }
+
+        .balance-pill .label {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .balance-pill .value {
+            font-size: 1.1rem;
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            line-height: 1;
+        }
+    </style>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    let currentGameId = null;
-    let isProcessing = false;
+    let gameId = null;
+
+    // Init balance display
+    document.addEventListener('DOMContentLoaded', () => {
+        const globalBal = document.getElementById('credits-balance');
+        const gameBal = document.getElementById('game-balance');
+        if (globalBal && gameBal) {
+            gameBal.textContent = globalBal.textContent;
+            const observer = new MutationObserver(() => { gameBal.textContent = globalBal.textContent; });
+            observer.observe(globalBal, { childList: true, characterData: true, subtree: true });
+        }
+    });
 
     function adjustBet(amount) {
         const input = document.getElementById('bet-amount');
-        const newValue = Math.max({{ min_bet }}, Math.min({{ max_bet }}, parseInt(input.value || 0) + amount));
-    input.value = newValue;
-}
+        let val = parseInt(input.value || 0) + amount;
+        setBet(val);
+    }
 
-    function renderCard(card, delay = 0) {
-        const isRed = ['♥', '♦'].includes(card.suit);
-        const cardEl = document.createElement('div');
-        cardEl.className = `playing-card ${isRed ? 'red' : 'black'}`;
-        cardEl.innerHTML = `<span class="card-rank">${card.rank}</span><span class="card-suit">${card.suit}</span>`;
+    function setBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const min = {{ min_bet }};
+    const max = {{ max_bet }};
+    input.value = Math.max(min, Math.min(max, amount));
+    }
 
-        if (delay > 0) {
-            cardEl.style.animation = `deal-card 0.3s ease-out ${delay}ms both`;
+    // Helper to render a card
+    function createCardElement(cardData) {
+        const card = document.createElement('div');
+
+        if (cardData.hidden) {
+            card.className = 'card hidden-card';
+            card.innerHTML = '<span>?</span>';
+            return card;
         }
 
-        return cardEl;
-    }
-
-    function renderHand(hand, elementId, animate = false) {
-        const container = document.getElementById(elementId);
-        container.innerHTML = '';
-        hand.forEach((card, i) => {
-            const cardEl = renderCard(card, animate ? i * 150 : 0);
-            container.appendChild(cardEl);
-            if (animate) {
-                setTimeout(() => playSound('cardDeal'), i * 150);
-            }
-        });
-    }
-
-    function showPhase(phase) {
-        ['betting', 'playing', 'gameover'].forEach(p => {
-            document.getElementById(`${p}-controls`).style.display = p === phase ? 'flex' : 'none';
-        });
+        const isRed = ['♥', '♦'].includes(cardData.suit);
+        card.className = `card ${isRed ? 'red' : 'black'}`;
+        card.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center;">
+                <span style="font-size:1.2rem;">${cardData.rank}</span>
+                <span style="font-size:1.5rem;">${cardData.suit || '?'}</span>
+            </div>
+        `;
+        return card;
     }
 
     async function deal() {
-        if (isProcessing) return;
-        isProcessing = true;
-
         const bet = parseFloat(document.getElementById('bet-amount').value);
-        const resultEl = document.getElementById('game-result');
-        resultEl.textContent = '';
-        resultEl.className = 'game-result';
+        const dealBtn = document.getElementById('deal-btn');
+        const messageEl = document.getElementById('game-message');
 
-        playSound('cardDeal');
+        dealBtn.disabled = true;
+        messageEl.textContent = '';
+
+        // Clear board
+        document.getElementById('dealer-cards').innerHTML = '';
+        document.getElementById('player-cards').innerHTML = '';
+        document.getElementById('dealer-score').textContent = '?';
+        document.getElementById('player-score').textContent = '0';
+
+        playSound('cardFan1');
 
         try {
             const response = await fetch('/api/games/blackjack/deal', {
@@ -121,174 +291,118 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.detail || 'Deal failed');
+                let msg = data.detail || 'Deal failed';
+                if (Array.isArray(msg)) msg = msg.map(e => e.msg).join(', ');
+                else if (typeof msg === 'object') msg = JSON.stringify(msg);
+                throw new Error(msg);
             }
 
-            currentGameId = data.game_id;
+            gameId = data.game_id;
+            updateGameState(data);
 
-            // Animate dealing cards
-            renderHand(data.player_hand, 'player-hand', true);
-            document.getElementById('player-value').textContent = `(${data.player_value})`;
-
-            // Show only dealer's up card or full hand if game complete
-            if (data.status === 'complete') {
-                renderHand(data.dealer_hand, 'dealer-hand', true);
-                document.getElementById('dealer-value').textContent = `(${data.dealer_value})`;
-                setTimeout(() => showResult(data), 500);
-            } else {
-                const dealerEl = document.getElementById('dealer-hand');
-                dealerEl.innerHTML = '';
-                dealerEl.appendChild(renderCard(data.dealer_up_card, 100));
-                setTimeout(() => playSound('cardDeal'), 100);
-
-                const hiddenCard = document.createElement('div');
-                hiddenCard.className = 'playing-card face-down';
-                hiddenCard.textContent = '?';
-                hiddenCard.style.animation = 'deal-card 0.3s ease-out 250ms both';
-                dealerEl.appendChild(hiddenCard);
-                setTimeout(() => playSound('cardDeal'), 250);
-
-                document.getElementById('dealer-value').textContent = '';
-                showPhase('playing');
-            }
-
+            // Switch controls
+            document.getElementById('bet-controls').style.display = 'none';
+            document.getElementById('play-controls').style.display = 'flex';
             updateBalance(data.balance);
 
         } catch (error) {
-            resultEl.textContent = '❌ ' + error.message;
-            resultEl.className = 'game-result error';
-            playSound('error');
+            messageEl.textContent = '❌ ' + error.message;
+            messageEl.style.color = '#ff5252';
+            dealBtn.disabled = false;
         }
-
-        isProcessing = false;
     }
 
     async function hit() {
-        if (isProcessing || !currentGameId) return;
-        isProcessing = true;
-
-        playSound('cardDeal');
+        if (!gameId) return;
+        playSound('cardSlide6');
 
         try {
             const response = await fetch('/api/games/blackjack/hit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ game_id: currentGameId })
+                body: JSON.stringify({ game_id: gameId })
             });
-
             const data = await response.json();
 
-            if (!response.ok || data.status === 'error') {
-                throw new Error(data.detail || data.error || 'Hit failed');
+            // Should verify this field exists in backend response for hit
+            // if not, we might need to manually add the new card from data.player_hand
+            // assuming data contains full state:
+            updateGameState(data);
+
+            if (data.status !== 'active') {
+                endGame(data);
             }
-
-            // Add new card with animation
-            const playerHand = document.getElementById('player-hand');
-            playerHand.appendChild(renderCard(data.new_card, 0));
-            document.getElementById('player-value').textContent = `(${data.player_value})`;
-
-            if (data.status === 'complete') {
-                playSound('cardFlip');
-                renderHand(data.dealer_hand, 'dealer-hand');
-                document.getElementById('dealer-value').textContent = `(${data.dealer_value})`;
-                showResult(data);
-            }
-
-            updateBalance(data.balance);
-
         } catch (error) {
-            document.getElementById('game-result').textContent = '❌ ' + error.message;
-            document.getElementById('game-result').className = 'game-result error';
-            playSound('error');
+            console.error(error);
         }
-
-        isProcessing = false;
     }
 
     async function stand() {
-        if (isProcessing || !currentGameId) return;
-        isProcessing = true;
-
-        playSound('cardFlip');
+        if (!gameId) return;
 
         try {
             const response = await fetch('/api/games/blackjack/stand', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ game_id: currentGameId })
+                body: JSON.stringify({ game_id: gameId })
             });
-
             const data = await response.json();
-
-            if (!response.ok || data.status === 'error') {
-                throw new Error(data.detail || data.error || 'Stand failed');
-            }
-
-            // Reveal dealer hand with animation
-            const dealerEl = document.getElementById('dealer-hand');
-            dealerEl.innerHTML = '';
-
-            for (let i = 0; i < data.dealer_hand.length; i++) {
-                setTimeout(() => {
-                    dealerEl.appendChild(renderCard(data.dealer_hand[i]));
-                    playSound('cardDeal');
-                }, i * 200);
-            }
-
-            setTimeout(() => {
-                document.getElementById('dealer-value').textContent = `(${data.dealer_value})`;
-                showResult(data);
-            }, data.dealer_hand.length * 200 + 100);
-
-            updateBalance(data.balance);
-
+            updateGameState(data);
+            endGame(data);
         } catch (error) {
-            document.getElementById('game-result').textContent = '❌ ' + error.message;
-            document.getElementById('game-result').className = 'game-result error';
-            playSound('error');
+            console.error(error);
         }
-
-        isProcessing = false;
     }
 
-    function showResult(data) {
-        const resultEl = document.getElementById('game-result');
-        const outcomes = {
-            'blackjack': '🎉 BLACKJACK! +' + data.payout + ' CR',
-            'win': '🎉 YOU WIN! +' + data.payout + ' CR',
-            'lose': '😔 Dealer wins',
-            'bust': '💥 BUST! Over 21',
-            'dealer_bust': '🎉 Dealer busts! +' + data.payout + ' CR',
-            'dealer_blackjack': '😔 Dealer has Blackjack!',
-            'push': '🤝 PUSH - Bet returned'
-        };
+    function updateGameState(data) {
+        // Render Dealer Cards
+        const dealerContainer = document.getElementById('dealer-cards');
+        dealerContainer.innerHTML = '';
+        data.dealer_hand.forEach(card => {
+            dealerContainer.appendChild(createCardElement(card));
+        });
 
-        resultEl.textContent = outcomes[data.outcome] || data.outcome;
-        resultEl.className = 'game-result ' + (data.payout > 0 ? 'win' : (data.outcome === 'push' ? 'push' : 'lose'));
+        // Render Player Cards
+        const playerContainer = document.getElementById('player-cards');
+        playerContainer.innerHTML = '';
+        data.player_hand.forEach((card, index) => {
+            // Animate only new cards if needed, but full re-render is safer for exact state
+            const cardEl = createCardElement(card);
+            // Add slight delay for deal animation based on index
+            cardEl.style.animationDelay = `${index * 0.1}s`;
+            playerContainer.appendChild(cardEl);
+        });
 
-        // Play appropriate sound
+        document.getElementById('player-score').textContent = data.player_score;
+        // Dealer score hidden if hidden card exists? 
+        // Backend handles score visibility usually, but if dealer has hidden card, score is partial.
+        // For simplicity, we show what backend sends.
+        document.getElementById('dealer-score').textContent = data.dealer_score;
+    }
+
+    function endGame(data) {
+        gameId = null;
+        document.getElementById('play-controls').style.display = 'none';
+        document.getElementById('bet-controls').style.display = 'block';
+        document.getElementById('deal-btn').disabled = false;
+
+        const messageEl = document.getElementById('game-message');
+
         if (data.payout > 0) {
-            playSound(data.outcome === 'blackjack' ? 'bigWin' : 'win');
-        } else if (data.outcome === 'push') {
-            playSound('ding');
+            messageEl.textContent = `🎉 YOU WIN! +${data.payout} CR`;
+            messageEl.style.color = '#4CAF50';
+            playSound('win');
+        } else if (data.status === 'push') {
+            messageEl.textContent = '🤝 PUSH';
+            messageEl.style.color = '#FFC107';
+            playSound('chipLay1'); // neutral sound
         } else {
+            messageEl.textContent = '💀 BUST / LOSE';
+            messageEl.style.color = '#f44336';
             playSound('lose');
         }
 
-        showPhase('gameover');
-        currentGameId = null;
-    }
-
-    function newGame() {
-        currentGameId = null;
-        document.getElementById('player-hand').innerHTML = '<div class="card-placeholder">Place your bet</div>';
-        document.getElementById('dealer-hand').innerHTML = '<div class="card-placeholder">Deal to start</div>';
-        document.getElementById('player-value').textContent = '';
-        document.getElementById('dealer-value').textContent = '';
-        document.getElementById('game-result').textContent = '';
-        document.getElementById('game-result').className = 'game-result';
-        showPhase('betting');
-        playSound('click');
+        updateBalance(data.balance);
     }
 </script>
 {% endblock %}

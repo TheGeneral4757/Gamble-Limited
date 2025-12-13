@@ -1,235 +1,778 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="exchange-container">
-    <div class="game-header">
-        <h2>💱 Conversion Hub</h2>
-        <a href="/" class="back-link">← Back to Lobby</a>
+<div class="exchange-container fintech-theme">
+    <div class="exchange-header">
+        <div class="header-content">
+            <h2><span class="pulse-icon">●</span> Global Market</h2>
+            <div class="countdown-container">
+                <span class="label">WEEKLY RESET IN</span>
+                <span id="reset-countdown" class="value">--:--:--</span>
+            </div>
+        </div>
+        <a href="/" class="back-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Back to Lobby
+        </a>
     </div>
 
-    <div class="exchange-grid">
-        <!-- Current Rates Card -->
-        <div class="exchange-card rates-card">
-            <h3>📊 Current Exchange Rates</h3>
-            <div class="rate-display">
-                <div class="rate-item">
-                    <span class="rate-label">Cash → Credits</span>
-                    <span class="rate-value" id="cash-to-credits">$1 = <span id="rate-credits">--</span> CR</span>
+    <!-- Main Dashboard -->
+    <div class="market-dashboard">
+        <!-- Rate Display (Left) -->
+        <div class="rate-panel">
+            <div class="current-rate-box">
+                <div class="rate-label">CURRENT EXCHANGE RATE</div>
+                <div class="rate-value-group">
+                    <span class="currency-symbol">$1 =</span>
+                    <span id="current-rate-display" class="big-rate">--.--</span>
+                    <span class="currency-unit">CR</span>
+                    <span id="trend-indicator" class="trend-badge stable">
+                        <span class="trend-icon">➜</span>
+                        <span class="trend-text">STABLE</span>
+                    </span>
                 </div>
-                <div class="rate-item">
-                    <span class="rate-label">Credits → Cash</span>
-                    <span class="rate-value" id="credits-to-cash"><span id="rate-cash">--</span> CR = $1</span>
+                <div class="rate-sub">
+                    <span id="rate-inverse">1000 CR = $--.--</span>
                 </div>
             </div>
-            <div class="rate-info">
-                <p>💡 Rates fluctuate ±5% from base rate</p>
-                <p>⏱️ Rates update every 30 seconds</p>
+
+            <!-- Chart Container -->
+            <div class="chart-container">
+                <canvas id="rateChart"></canvas>
             </div>
-            <button class="refresh-btn" onclick="refreshRates()">🔄 Refresh Rates</button>
         </div>
 
-        <!-- Convert Cash to Credits -->
-        <div class="exchange-card convert-card">
-            <h3>💵 Cash → Credits</h3>
-            <div class="convert-form">
+        <!-- Trading Panel (Right) -->
+        <div class="trade-panel">
+            <div class="panel-tabs">
+                <button class="tab-btn active" onclick="switchTab('buy')" id="tab-buy">Buy Credits</button>
+                <button class="tab-btn" onclick="switchTab('sell')" id="tab-sell">Sell Credits</button>
+            </div>
+
+            <div class="trade-form">
+                <!-- Balance Row -->
+                <div class="balance-row">
+                    <span>Available:</span>
+                    <span id="available-balance" class="balance-amount">Loading...</span>
+                </div>
+
+                <!-- Input Amount -->
                 <div class="input-group">
-                    <label>Amount to Convert</label>
-                    <div class="input-with-symbol">
-                        <span class="symbol">$</span>
-                        <input type="number" id="cash-amount" min="1" value="100" onchange="updatePreview('cash')">
+                    <label id="input-label">Amount (Cash)</label>
+                    <div class="input-wrapper">
+                        <span class="input-prefix" id="input-prefix">$</span>
+                        <input type="number" id="trade-amount" placeholder="0.00" min="1" oninput="updateEstimate()">
+                        <button class="max-btn" onclick="setMax()">MAX</button>
                     </div>
                 </div>
-                <div class="preview">
-                    <span>You'll receive:</span>
-                    <span class="preview-value" id="credits-preview">-- CR</span>
+
+                <!-- Estimate Output -->
+                <div class="estimate-group">
+                    <label id="output-label">Receive (Credits)</label>
+                    <div class="estimate-value" id="trade-estimate">0.00</div>
                 </div>
-                <button class="action-btn convert-btn" onclick="convertCurrency('cash')">
-                    Convert to Credits
+
+                <!-- Action Button -->
+                <button id="trade-btn" class="trade-action-btn buy" onclick="executeTrade()">
+                    CONFIRM BUY
                 </button>
-            </div>
-        </div>
 
-        <!-- Convert Credits to Cash -->
-        <div class="exchange-card convert-card">
-            <h3>🎰 Credits → Cash</h3>
-            <div class="convert-form">
-                <div class="input-group">
-                    <label>Amount to Convert</label>
-                    <div class="input-with-symbol">
-                        <span class="symbol">CR</span>
-                        <input type="number" id="credits-amount" min="1" value="100"
-                            onchange="updatePreview('credits')">
-                    </div>
-                </div>
-                <div class="preview">
-                    <span>You'll receive:</span>
-                    <span class="preview-value" id="cash-preview">$--</span>
-                </div>
-                <button class="action-btn convert-btn" onclick="convertCurrency('credits')">
-                    Convert to Cash
-                </button>
-            </div>
-        </div>
-
-        <!-- Your Balance -->
-        <div class="exchange-card balance-card">
-            <h3>👛 Your Balance</h3>
-            <div class="balance-display">
-                <div class="balance-item">
-                    <span class="balance-label">Cash</span>
-                    <span class="balance-value cash">$<span id="your-cash">--</span></span>
-                </div>
-                <div class="balance-item">
-                    <span class="balance-label">Credits</span>
-                    <span class="balance-value credits"><span id="your-credits">--</span> CR</span>
-                </div>
-            </div>
-            <div class="total-value">
-                <span>Total Value (in Cash):</span>
-                <span class="total" id="total-value">$--</span>
-            </div>
-        </div>
-
-        <!-- Rate History -->
-        <div class="exchange-card history-card wide">
-            <h3>📈 Rate Tips</h3>
-            <div class="tips-grid">
-                <div class="tip">
-                    <span class="tip-icon">⬆️</span>
-                    <span class="tip-text">Convert cash to credits when rate is <strong>high</strong></span>
-                </div>
-                <div class="tip">
-                    <span class="tip-icon">⬇️</span>
-                    <span class="tip-text">Convert credits to cash when rate is <strong>low</strong></span>
-                </div>
-                <div class="tip">
-                    <span class="tip-icon">🎲</span>
-                    <span class="tip-text">Play games with credits to keep cash safe</span>
-                </div>
-                <div class="tip">
-                    <span class="tip-icon">💰</span>
-                    <span class="tip-text">Base rate is 10 CR per $1</span>
-                </div>
+                <div id="trade-message" class="trade-message"></div>
             </div>
         </div>
     </div>
 
-    <div id="exchange-result" class="exchange-result"></div>
+    <!-- Market Stats -->
+    <div class="market-stats">
+        <div class="stat-card">
+            <span class="stat-label">24h Volatility</span>
+            <span class="stat-value high">HIGH</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Market Status</span>
+            <span class="stat-value" id="market-status">OPEN</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Friday Bonus</span>
+            <span class="stat-value" id="friday-bonus">INACTIVE</span>
+        </div>
+    </div>
 </div>
+
+<style>
+    /* FinTech Theme Styles */
+    .fintech-theme {
+        --color-bg: #0a0b1e;
+        --color-panel: #13152a;
+        --color-accent: #00f2ea;
+        --color-accent-dim: rgba(0, 242, 234, 0.1);
+        --color-success: #00ff9d;
+        --color-danger: #ff0055;
+        --color-text-main: #ffffff;
+        --color-text-dim: #8b9bb4;
+
+        font-family: 'Inter', system-ui, sans-serif;
+        color: var(--color-text-main);
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .exchange-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .header-content h2 {
+        font-size: 1.8rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+    }
+
+    .pulse-icon {
+        color: var(--color-success);
+        animation: pulse 2s infinite;
+        font-size: 0.8em;
+    }
+
+    .countdown-container {
+        display: flex;
+        flex-direction: column;
+        margin-left: 2rem;
+    }
+
+    .countdown-container .label {
+        font-size: 0.7rem;
+        color: var(--color-text-dim);
+        font-weight: 600;
+        letter-spacing: 1px;
+    }
+
+    .countdown-container .value {
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--color-accent);
+        font-weight: 700;
+    }
+
+    .back-link {
+        color: var(--color-text-dim);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+        transition: color 0.2s;
+    }
+
+    .back-link:hover {
+        color: white;
+    }
+
+    /* Dashboard Grid */
+    .market-dashboard {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+        .market-dashboard {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Rate Panel */
+    .rate-panel {
+        background: var(--color-panel);
+        border-radius: 16px;
+        padding: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        flex-direction: column;
+        height: 500px;
+    }
+
+    .current-rate-box {
+        margin-bottom: 2rem;
+    }
+
+    .rate-label {
+        color: var(--color-text-dim);
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .rate-value-group {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+    }
+
+    .currency-symbol {
+        font-size: 1.5rem;
+        color: var(--color-text-dim);
+    }
+
+    .big-rate {
+        font-size: 3.5rem;
+        font-weight: 800;
+        letter-spacing: -1px;
+        background: linear-gradient(180deg, #fff, #b4c6e3);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .currency-unit {
+        font-size: 1.5rem;
+        color: var(--color-text-dim);
+        font-weight: 700;
+    }
+
+    .trend-badge {
+        margin-left: 1rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .trend-badge.rising {
+        background: rgba(0, 255, 157, 0.1);
+        color: var(--color-success);
+    }
+
+    .trend-badge.falling {
+        background: rgba(255, 0, 85, 0.1);
+        color: var(--color-danger);
+    }
+
+    .trend-badge.stable {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--color-text-dim);
+    }
+
+    .rate-sub {
+        color: var(--color-text-dim);
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    .chart-container {
+        flex: 1;
+        width: 100%;
+        position: relative;
+    }
+
+    /* Trade Panel */
+    .trade-panel {
+        background: var(--color-panel);
+        border-radius: 16px;
+        padding: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .panel-tabs {
+        display: flex;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 4px;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+        flex: 1;
+        padding: 0.75rem;
+        border: none;
+        background: transparent;
+        color: var(--color-text-dim);
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .tab-btn#tab-buy.active {
+        background: rgba(0, 255, 157, 0.1);
+        color: var(--color-success);
+    }
+
+    .tab-btn#tab-sell.active {
+        background: rgba(255, 0, 85, 0.1);
+        color: var(--color-danger);
+    }
+
+    .trade-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        flex: 1;
+    }
+
+    .balance-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+        color: var(--color-text-dim);
+    }
+
+    .balance-amount {
+        color: white;
+        font-weight: 600;
+    }
+
+    .input-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--color-text-dim);
+        font-weight: 600;
+    }
+
+    .input-wrapper {
+        display: flex;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 0.75rem;
+        transition: border-color 0.2s;
+    }
+
+    .input-wrapper:focus-within {
+        border-color: var(--color-accent);
+    }
+
+    .input-prefix {
+        color: var(--color-text-dim);
+        font-weight: 600;
+        margin-right: 0.5rem;
+    }
+
+    input[type="number"] {
+        background: transparent;
+        border: none;
+        color: white;
+        font-size: 1.2rem;
+        font-weight: 600;
+        width: 100%;
+        outline: none;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .max-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: var(--color-accent);
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .max-btn:hover {
+        background: rgba(0, 242, 234, 0.2);
+    }
+
+    .estimate-group {
+        background: rgba(255, 255, 255, 0.02);
+        padding: 1rem;
+        border-radius: 10px;
+    }
+
+    .estimate-value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: white;
+    }
+
+    .trade-action-btn {
+        padding: 1rem;
+        border: none;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.2s, opacity 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: auto;
+    }
+
+    .trade-action-btn:active {
+        transform: scale(0.98);
+    }
+
+    .trade-action-btn.buy {
+        background: var(--color-success);
+        color: #000;
+        box-shadow: 0 4px 15px rgba(0, 255, 157, 0.3);
+    }
+
+    .trade-action-btn.sell {
+        background: var(--color-danger);
+        color: white;
+        box-shadow: 0 4px 15px rgba(255, 0, 85, 0.3);
+    }
+
+    .market-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .stat-card {
+        background: var(--color-panel);
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        color: var(--color-text-dim);
+    }
+
+    .stat-value {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .stat-value.high {
+        color: var(--color-danger);
+    }
+
+    .stat-value.low {
+        color: var(--color-success);
+    }
+
+    .trade-message {
+        text-align: center;
+        min-height: 20px;
+        font-size: 0.9rem;
+    }
+
+    .trade-message.success {
+        color: var(--color-success);
+    }
+
+    .trade-message.error {
+        color: var(--color-danger);
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+
+        100% {
+            opacity: 1;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    let currentRate = 10;
+    let mode = 'buy'; // 'buy' or 'sell'
+    let currentRate = 10.0;
+    let balance = { cash: 0, credits: 0 };
+    let chartInstance = null;
 
-    async function refreshRates() {
+    // --- Chart Setup ---
+    function initChart() {
+        const ctx = document.getElementById('rateChart').getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(0, 255, 157, 0.2)');
+        gradient.addColorStop(1, 'rgba(0, 255, 157, 0)');
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(20).fill(''),
+                datasets: [{
+                    label: 'Exchange Rate',
+                    data: Array(20).fill(10),
+                    borderColor: '#00ff9d',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: false },
+                    y: {
+                        display: true,
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#8b9bb4' }
+                    }
+                },
+                animation: { duration: 0 }
+            }
+        });
+    }
+
+    // --- Core Functions ---
+    async function updateData() {
         try {
-            const response = await fetch('/api/economy/rate');
-            const data = await response.json();
-            currentRate = data.rate;
+            // Get Rate
+            const rateRes = await fetch('/api/economy/rate');
+            const rateData = await rateRes.json();
 
-            document.getElementById('rate-credits').textContent = currentRate.toFixed(2);
-            document.getElementById('rate-cash').textContent = currentRate.toFixed(2);
+            // Get Balance
+            const balRes = await fetch('/api/economy/balance');
+            const balData = await balRes.json();
 
-            updatePreview('cash');
-            updatePreview('credits');
-            updateTotalValue();
+            // Get rate history (simulated from current rate for now, ideal would be API returning history)
+            // But economy.py now tracks history! Let's assume rate API returns it or we just use current.
+            // Wait, I didn't update API to return history. Let's rely on standard data for now.
+            // Actually, economy.py get_rate_info DOES return history.
+            // But api.py /economy/rate currently only returns {rate: x}.
+            // I should update API to return full info if possible, but let's stick to simple rate for now.
 
-            playSound('ding');
-        } catch (error) {
-            console.error('Failed to refresh rates:', error);
+            currentRate = rateData.rate;
+            balance = { cash: balData.cash, credits: balData.credits };
+
+            updateUI();
+
+            // Push to chart
+            const chartData = chartInstance.data.datasets[0].data;
+            chartData.push(currentRate);
+            if (chartData.length > 20) chartData.shift();
+
+            // Update Chart Color based on trend
+            const start = chartData[0];
+            const end = chartData[chartData.length - 1];
+            const color = end >= start ? '#00ff9d' : '#ff0055';
+            chartInstance.data.datasets[0].borderColor = color;
+
+            // Update gradient
+            const ctx = chartInstance.ctx;
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, end >= start ? 'rgba(0, 255, 157, 0.2)' : 'rgba(255, 0, 85, 0.2)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            chartInstance.data.datasets[0].backgroundColor = gradient;
+
+            chartInstance.update('none'); // No animation for updates
+
+        } catch (e) {
+            console.error(e);
         }
     }
 
-    function updatePreview(type) {
-        if (type === 'cash') {
-            const amount = parseFloat(document.getElementById('cash-amount').value) || 0;
-            const credits = amount * currentRate;
-            document.getElementById('credits-preview').textContent = credits.toFixed(2) + ' CR';
+    function updateUI() {
+        // Update Rate text
+        const rateEl = document.getElementById('current-rate-display');
+        const prev = parseFloat(rateEl.textContent) || 0;
+
+        // Count up animation
+        rateEl.textContent = currentRate.toFixed(2);
+
+        // Inverse Rate
+        const inverse = (1000 / currentRate).toFixed(2);
+        document.getElementById('rate-inverse').textContent = `1000 CR = $${inverse}`;
+
+        // Trend
+        const trendEl = document.getElementById('trend-indicator');
+        if (currentRate > prev) {
+            trendEl.className = 'trend-badge rising';
+            trendEl.innerHTML = '<span class="trend-icon">↗</span> RISING';
+        } else if (currentRate < prev) {
+            trendEl.className = 'trend-badge falling';
+            trendEl.innerHTML = '<span class="trend-icon">↘</span> FALLING';
+        }
+
+        // Balance
+        const balEl = document.getElementById('available-balance');
+        if (mode === 'buy') {
+            balEl.textContent = `$${balance.cash.toFixed(2)}`;
         } else {
-            const amount = parseFloat(document.getElementById('credits-amount').value) || 0;
-            const cash = amount / currentRate;
-            document.getElementById('cash-preview').textContent = '$' + cash.toFixed(2);
+            balEl.textContent = `${balance.credits.toFixed(2)} CR`;
+        }
+
+        updateEstimate();
+    }
+
+    function switchTab(newMode) {
+        mode = newMode;
+
+        // Update Tabs
+        document.getElementById('tab-buy').classList.toggle('active', mode === 'buy');
+        document.getElementById('tab-sell').classList.toggle('active', mode === 'sell');
+
+        // Update Inputs
+        const label = document.getElementById('input-label');
+        const prefix = document.getElementById('input-prefix');
+        const outLabel = document.getElementById('output-label');
+        const btn = document.getElementById('trade-btn');
+        const input = document.getElementById('trade-amount');
+
+        input.value = '';
+        document.getElementById('trade-estimate').textContent = '0.00';
+
+        if (mode === 'buy') {
+            label.textContent = 'Amount (Cash)';
+            prefix.textContent = '$';
+            outLabel.textContent = 'Receive (Credits)';
+            btn.textContent = 'CONFIRM BUY';
+            btn.className = 'trade-action-btn buy';
+        } else {
+            label.textContent = 'Amount (Credits)';
+            prefix.textContent = 'CR';
+            outLabel.textContent = 'Receive (Cash)';
+            btn.textContent = 'CONFIRM SELL';
+            btn.className = 'trade-action-btn sell';
+        }
+
+        updateUI();
+    }
+
+    function updateEstimate() {
+        const amount = parseFloat(document.getElementById('trade-amount').value) || 0;
+        const estEl = document.getElementById('trade-estimate');
+
+        if (mode === 'buy') {
+            const received = amount * currentRate;
+            estEl.textContent = `${received.toFixed(2)} CR`;
+        } else {
+            const received = amount / currentRate;
+            estEl.textContent = `$${received.toFixed(2)}`;
         }
     }
 
-    async function convertCurrency(fromType) {
-        const resultEl = document.getElementById('exchange-result');
-        resultEl.textContent = '';
-        resultEl.className = 'exchange-result';
-
-        let amount;
-        if (fromType === 'cash') {
-            amount = parseFloat(document.getElementById('cash-amount').value);
+    function setMax() {
+        const input = document.getElementById('trade-amount');
+        if (mode === 'buy') {
+            input.value = balance.cash;
         } else {
-            amount = parseFloat(document.getElementById('credits-amount').value);
+            input.value = balance.credits;
         }
+        updateEstimate();
+    }
 
-        if (!amount || amount <= 0) {
-            resultEl.textContent = '❌ Enter a valid amount';
-            resultEl.classList.add('error');
-            return;
-        }
+    async function executeTrade() {
+        const amount = parseFloat(document.getElementById('trade-amount').value);
+        const input = document.getElementById('trade-amount');
+        const msg = document.getElementById('trade-message');
+
+        if (!amount || amount <= 0) return;
+
+        const currency = mode === 'buy' ? 'cash' : 'credits';
 
         try {
             const response = await fetch('/api/economy/exchange', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ from_currency: fromType, amount })
+                body: JSON.stringify({ from_currency: currency, amount })
             });
 
             const data = await response.json();
 
-            if (!response.ok) {
-                throw new Error(data.detail || 'Exchange failed');
-            }
-
             if (data.success) {
-                const received = data.received.toFixed(2);
-                const currency = fromType === 'cash' ? 'credits' : 'cash';
-                resultEl.innerHTML = `✅ Converted! Received ${currency === 'cash' ? '$' : ''}${received}${currency === 'credits' ? ' CR' : ''}`;
-                resultEl.classList.add('success');
-
-                updateBalance(data.balance);
-                updateLocalBalance(data.balance);
+                msg.textContent = 'Trade Successful!';
+                msg.className = 'trade-message success';
                 playSound('coin');
+                input.value = '';
+                updateData(); // Refresh immediately
+
+                setTimeout(() => msg.textContent = '', 3000);
             } else {
-                throw new Error(data.error || 'Exchange failed');
+                msg.textContent = data.detail || 'Trade failed';
+                msg.className = 'trade-message error';
+                playSound('error');
+            }
+        } catch (e) {
+            msg.textContent = 'Network error';
+            msg.className = 'trade-message error';
+        }
+    }
+
+    // --- Weekly Reset Countdown ---
+    function updateCountdown() {
+        try {
+            const now = new Date();
+            const friday = new Date();
+            const currentDay = now.getDay();
+            const daysUntilFriday = (5 - currentDay + 7) % 7;
+
+            friday.setDate(now.getDate() + daysUntilFriday);
+            friday.setHours(12, 0, 0, 0);
+
+            // If it's Friday but past 12pm, target next Friday
+            if (daysUntilFriday === 0 && now > friday) {
+                friday.setDate(friday.getDate() + 7);
+            }
+            // If it's not Friday, but we are somehow past target (unlikely with above math but safe check)
+            else if (now > friday) {
+                friday.setDate(friday.getDate() + 7);
             }
 
-        } catch (error) {
-            resultEl.textContent = '❌ ' + error.message;
-            resultEl.classList.add('error');
-            playSound('error');
+            const diff = friday - now;
+
+            // Format time
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+            let text = "";
+            if (d > 0) text += `${d}d `;
+            text += `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+            const el = document.getElementById('reset-countdown');
+            if (el) el.textContent = text;
+        } catch (e) {
+            console.error("Timer error:", e);
+            document.getElementById('reset-countdown').textContent = "ERROR";
         }
     }
 
-    function updateLocalBalance(balance) {
-        document.getElementById('your-cash').textContent = balance.cash.toFixed(2);
-        document.getElementById('your-credits').textContent = balance.credits.toFixed(2);
-        updateTotalValue();
-    }
-
-    function updateTotalValue() {
-        const cash = parseFloat(document.getElementById('your-cash').textContent) || 0;
-        const credits = parseFloat(document.getElementById('your-credits').textContent) || 0;
-        const total = cash + (credits / currentRate);
-        document.getElementById('total-value').textContent = '$' + total.toFixed(2);
-    }
-
-    async function loadBalance() {
-        try {
-            const response = await fetch('/api/economy/balance');
-            const data = await response.json();
-            updateLocalBalance(data);
-        } catch (error) {
-            console.error('Failed to load balance:', error);
-        }
-    }
-
-    // Initialize
-    refreshRates();
-    loadBalance();
-    setInterval(refreshRates, 30000);
+    // --- Init ---
+    document.addEventListener('DOMContentLoaded', () => {
+        initChart();
+        updateData();
+        setInterval(updateData, 5000); // 5s update loop
+        setInterval(updateCountdown, 1000);
+        updateCountdown();
+    });
 </script>
 {% endblock %}

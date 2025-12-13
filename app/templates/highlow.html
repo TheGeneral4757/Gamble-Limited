@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container highlow-game">
+    <!-- Premium Game Header -->
+    <div class="game-header">
+        <div class="header-left">
+            <a href="/" class="back-link">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                BACK
+            </a>
+        </div>
+        <div class="header-center">
+            <h2><span class="pulse-icon">🃏</span> HIGH / LOW</h2>
+        </div>
+        <div class="header-right">
+            <div class="balance-pill">
+                <span class="label">CREDITS</span>
+                <span class="value" id="game-balance">---</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="cards-display">
+            <div class="card-slot current">
+                <div class="card" id="current-card">
+                    <span class="card-value">?</span>
+                </div>
+                <span class="card-label">Current Card</span>
+            </div>
+            <div class="vs-indicator">VS</div>
+            <div class="card-slot next">
+                <div class="card hidden" id="next-card">
+                    <span class="card-value">?</span>
+                </div>
+                <span class="card-label">Next Card</span>
+            </div>
+        </div>
+
+        <div class="streak-display" id="streak-display">
+            <span class="streak-label">Streak:</span>
+            <span class="streak-count" id="streak-count">0</span>
+            <span class="multiplier-label">Multiplier:</span>
+            <span class="multiplier-value" id="multiplier-value">1x</span>
+        </div>
+
+        <div id="game-result" class="game-result"></div>
+    </div>
+
+    <div class="guess-buttons" id="guess-buttons" style="display: none;">
+        <button class="guess-btn higher" onclick="makeGuess('higher')">
+            ⬆️ HIGHER
+        </button>
+        <button class="cashout-btn" id="cashout-btn" onclick="cashOut()" disabled>
+            💰 CASH OUT<br>
+            <span id="cashout-amount">0 CR</span>
+        </button>
+        <button class="guess-btn lower" onclick="makeGuess('lower')">
+            ⬇️ LOWER
+        </button>
+    </div>
+
+    <div class="game-controls" id="start-controls">
+        <div class="bet-controls">
+            <label>BET AMOUNT</label>
+            <div class="bet-input-wrapper">
+                <button class="bet-adjust" onclick="adjustBet(-5); playSound('click');">-</button>
+                <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                <button class="bet-adjust" onclick="adjustBet(5); playSound('click');">+</button>
+            </div>
+            <div class="bet-quick-actions">
+                <button class="quick-bet-btn" onclick="setBet({{ min_bet }})">MIN</button>
+                <button class="quick-bet-btn" onclick="setBet({{ max_bet }})">MAX</button>
+            </div>
+        </div>
+        <button class="action-btn start-btn" id="start-btn" onclick="startGame()">
+            <span class="btn-icon">🃏</span> START GAME
+        </button>
+    </div>
+
+    <style>
+        /* High/Low Specifics */
+        .guess-btn {
+            background: var(--bg-panel);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            min-width: 140px;
+        }
+
+        .guess-btn.higher:hover {
+            border-color: var(--success);
+            box-shadow: 0 0 15px rgba(0, 255, 157, 0.3);
+            background: rgba(0, 255, 157, 0.1);
+        }
+
+        .guess-btn.lower:hover {
+            border-color: var(--danger);
+            box-shadow: 0 0 15px rgba(255, 71, 87, 0.3);
+            background: rgba(255, 71, 87, 0.1);
+        }
+
+        .multiplier-ladder {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            border-radius: 16px;
+        }
+
+        .ladder-item {
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .ladder-item.active {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 242, 234, 0.4);
+            transform: scale(1.1);
+        }
+
+        /* Quick Actions & Balance Pill (Copied from Slots) */
+        .bet-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .bet-quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .quick-bet-btn {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: var(--text-dim);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-bet-btn:hover {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .balance-pill {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            min-width: 100px;
+        }
+
+        .balance-pill .label {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .balance-pill .value {
+            font-size: 1.1rem;
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            line-height: 1;
+        }
+    </style>
+
+    <div class="multiplier-ladder">
+        <div class="ladder-title">Streak Multipliers</div>
+        <div class="ladder-items" id="ladder-items">
+            <span class="ladder-item" data-streak="0">1x</span>
+            <span class="ladder-item" data-streak="1">1.5x</span>
+            <span class="ladder-item" data-streak="2">2x</span>
+            <span class="ladder-item" data-streak="3">3x</span>
+            <span class="ladder-item" data-streak="4">5x</span>
+            <span class="ladder-item" data-streak="5">10x</span>
+            <span class="ladder-item" data-streak="6">20x</span>
+            <span class="ladder-item" data-streak="7">50x</span>
+        </div>
+    </div>
+</div>
+
+<style>
+    .highlow-game .cards-display {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        margin: 30px 0;
+    }
+
+    .card-slot {
+        text-align: center;
+    }
+
+    .card {
+        width: 100px;
+        height: 140px;
+        background: linear-gradient(145deg, #fff, #e0e0e0);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #333;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+
+    .card.hidden {
+        background: linear-gradient(145deg, #667eea, #764ba2);
+        color: #fff;
+    }
+
+    .card.red {
+        color: #e53935;
+    }
+
+    .card.black {
+        color: #333;
+    }
+
+    .card.winner {
+        box-shadow: 0 0 30px rgba(76, 175, 80, 0.7);
+        animation: cardWin 0.5s ease;
+    }
+
+    .card.loser {
+        box-shadow: 0 0 30px rgba(244, 67, 54, 0.7);
+    }
+
+    @keyframes cardWin {
+
+        0%,
+        100% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.1);
+        }
+    }
+
+    .vs-indicator {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #ffd700;
+    }
+
+    .card-label {
+        display: block;
+        margin-top: 10px;
+        font-size: 0.9rem;
+        opacity: 0.7;
+    }
+
+    .streak-display {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        margin: 20px auto;
+        max-width: 400px;
+    }
+
+    .streak-count,
+    .multiplier-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #ffd700;
+    }
+
+    .guess-buttons {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        margin: 20px 0;
+    }
+
+    .guess-btn {
+        padding: 20px 40px;
+        font-size: 1.2rem;
+        font-weight: bold;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .guess-btn.higher {
+        background: linear-gradient(135deg, #4CAF50, #388E3C);
+        color: white;
+    }
+
+    .guess-btn.lower {
+        background: linear-gradient(135deg, #f44336, #c62828);
+        color: white;
+    }
+
+    .guess-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .cashout-btn {
+        padding: 15px 25px;
+        font-size: 1rem;
+        font-weight: bold;
+        background: linear-gradient(135deg, #ffd700, #ff8c00);
+        color: #000;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .cashout-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .cashout-btn:not(:disabled):hover {
+        transform: scale(1.05);
+    }
+
+    .multiplier-ladder {
+        margin-top: 30px;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 12px;
+    }
+
+    .ladder-title {
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 10px;
+        opacity: 0.7;
+    }
+
+    .ladder-items {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .ladder-item {
+        padding: 8px 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+
+    .ladder-item.active {
+        background: linear-gradient(135deg, #ffd700, #ff8c00);
+        color: #000;
+        font-weight: bold;
+    }
+
+    .ladder-item.passed {
+        background: rgba(76, 175, 80, 0.3);
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let gameId = null;
+    let currentStreak = 0;
+    let betAmount = 0;
+
+    // Init balance display
+    document.addEventListener('DOMContentLoaded', () => {
+        const globalBal = document.getElementById('credits-balance');
+        const gameBal = document.getElementById('game-balance');
+        if (globalBal && gameBal) {
+            gameBal.textContent = globalBal.textContent;
+            const observer = new MutationObserver(() => { gameBal.textContent = globalBal.textContent; });
+            observer.observe(globalBal, { childList: true, characterData: true, subtree: true });
+        }
+    });
+
+    function adjustBet(amount) {
+        const input = document.getElementById('bet-amount');
+        let val = parseInt(input.value || 0) + amount;
+        setBet(val);
+    }
+
+    function setBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const min = {{ min_bet }};
+    const max = {{ max_bet }};
+    input.value = Math.max(min, Math.min(max, amount));
+    }
+
+    async function startGame() {
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        const startBtn = document.getElementById('start-btn');
+
+        startBtn.disabled = true;
+        startBtn.textContent = '🃏 DEALING...';
+
+        try {
+            const response = await fetch('/api/games/highlow/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bet })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                let msg = data.detail || 'Start failed';
+                if (Array.isArray(msg)) msg = msg.map(e => e.msg).join(', ');
+                else if (typeof msg === 'object') msg = JSON.stringify(msg);
+                throw new Error(msg);
+            }
+
+            gameId = data.game_id;
+            betAmount = data.bet;
+            currentStreak = 0;
+
+            // Show current card
+            const currentCard = document.getElementById('current-card');
+            currentCard.classList.remove('hidden');
+            currentCard.querySelector('.card-value').textContent = data.current_card_display;
+
+            // Update UI
+            updateStreak(0, data.current_multiplier);
+            document.getElementById('start-controls').style.display = 'none';
+            document.getElementById('guess-buttons').style.display = 'flex';
+            document.getElementById('cashout-btn').disabled = true;
+            document.getElementById('cashout-amount').textContent = `${data.potential_payout} CR`;
+
+            updateBalance(data.balance);
+            playSound('deal');
+
+        } catch (error) {
+            document.getElementById('game-result').textContent = '❌ ' + error.message;
+            document.getElementById('game-result').classList.add('error');
+            playSound('error');
+        }
+
+        startBtn.disabled = false;
+        startBtn.textContent = '🃏 START GAME';
+    }
+
+    async function makeGuess(choice) {
+        if (!gameId) return;
+
+        const guessButtons = document.querySelectorAll('.guess-btn');
+        guessButtons.forEach(btn => btn.disabled = true);
+
+        try {
+            const response = await fetch('/api/games/highlow/guess', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ game_id: gameId, choice })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Guess failed');
+            }
+
+            // Show the next card
+            const nextCard = document.getElementById('next-card');
+            nextCard.classList.remove('hidden');
+            nextCard.querySelector('.card-value').textContent = data.new_card_display;
+
+            await new Promise(r => setTimeout(r, 500));
+
+            if (data.correct) {
+                nextCard.classList.add('winner');
+                playSound('win');
+
+                // Update streak
+                currentStreak = data.streak;
+                updateStreak(data.streak, data.current_multiplier);
+
+                // Enable cashout
+                document.getElementById('cashout-btn').disabled = false;
+                document.getElementById('cashout-amount').textContent = `${data.potential_payout} CR`;
+
+                // Move next card to current position
+                await new Promise(r => setTimeout(r, 1000));
+                const currentCard = document.getElementById('current-card');
+                currentCard.querySelector('.card-value').textContent = data.new_card_display;
+                nextCard.classList.add('hidden');
+                nextCard.classList.remove('winner');
+                nextCard.querySelector('.card-value').textContent = '?';
+
+                guessButtons.forEach(btn => btn.disabled = false);
+                updateBalance(data.balance);
+
+            } else {
+                // Game over - lost
+                nextCard.classList.add('loser');
+                playSound('lose');
+
+                document.getElementById('game-result').innerHTML = `😔 ${data.message}`;
+                document.getElementById('game-result').classList.add('lose');
+
+                gameOver();
+                updateBalance(data.balance);
+            }
+
+        } catch (error) {
+            document.getElementById('game-result').textContent = '❌ ' + error.message;
+            playSound('error');
+            guessButtons.forEach(btn => btn.disabled = false);
+        }
+    }
+
+    async function cashOut() {
+        if (!gameId) return;
+
+        const cashoutBtn = document.getElementById('cashout-btn');
+        cashoutBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/games/highlow/cashout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ game_id: gameId })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Cashout failed');
+            }
+
+            document.getElementById('game-result').innerHTML = `🎉 <strong>CASHED OUT!</strong> ${data.final_multiplier}x = +${data.payout} CR`;
+            document.getElementById('game-result').classList.add('win');
+            playSound('win');
+
+            updateBalance(data.balance);
+            gameOver();
+
+        } catch (error) {
+            document.getElementById('game-result').textContent = '❌ ' + error.message;
+            playSound('error');
+            cashoutBtn.disabled = false;
+        }
+    }
+
+    function updateStreak(streak, multiplier) {
+        document.getElementById('streak-count').textContent = streak;
+        document.getElementById('multiplier-value').textContent = `${multiplier}x`;
+
+        // Update ladder
+        document.querySelectorAll('.ladder-item').forEach(item => {
+            const itemStreak = parseInt(item.dataset.streak);
+            item.classList.remove('active', 'passed');
+            if (itemStreak === streak) {
+                item.classList.add('active');
+            } else if (itemStreak < streak) {
+                item.classList.add('passed');
+            }
+        });
+    }
+
+    function gameOver() {
+        gameId = null;
+        document.getElementById('guess-buttons').style.display = 'none';
+        document.getElementById('start-controls').style.display = 'block';
+
+        // Reset cards
+        document.getElementById('current-card').classList.add('hidden');
+        document.getElementById('current-card').querySelector('.card-value').textContent = '?';
+        document.getElementById('next-card').classList.add('hidden');
+        document.getElementById('next-card').classList.remove('loser', 'winner');
+        document.getElementById('next-card').querySelector('.card-value').textContent = '?';
+
+        // Reset ladder
+        updateStreak(0, 1);
+    }
+
+
+</script>
+{% endblock %}

@@ -2,9 +2,25 @@
 
 {% block content %}
 <div class="game-container roulette-game">
+    <!-- Premium Game Header -->
     <div class="game-header">
-        <h2>🎡 Roulette</h2>
-        <a href="/" class="back-link">← Back to Lobby</a>
+        <div class="header-left">
+            <a href="/" class="back-link">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                BACK
+            </a>
+        </div>
+        <div class="header-center">
+            <h2><span class="pulse-icon">🎡</span> ROULETTE</h2>
+        </div>
+        <div class="header-right">
+            <div class="balance-pill">
+                <span class="label">CREDITS</span>
+                <span class="value" id="game-balance">---</span>
+            </div>
+        </div>
     </div>
 
     <div class="game-area">
@@ -49,129 +65,274 @@
     </div>
 
     <div class="game-controls">
-        <div class="bet-controls">
-            <label>Bet Amount</label>
-            <div class="bet-input-group">
-                <button class="bet-adjust" onclick="adjustBet(-5); playSound('click');">-</button>
-                <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
-                <button class="bet-adjust" onclick="adjustBet(5); playSound('click');">+</button>
+        <div class="game-controls">
+            <div class="bet-controls">
+                <label>BET AMOUNT</label>
+                <div class="bet-input-wrapper">
+                    <button class="bet-adjust" onclick="adjustBet(-5); playSound('click');">-</button>
+                    <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                    <button class="bet-adjust" onclick="adjustBet(5); playSound('click');">+</button>
+                </div>
+                <div class="bet-quick-actions">
+                    <button class="quick-bet-btn" onclick="setBet({{ min_bet }})">MIN</button>
+                    <button class="quick-bet-btn" onclick="setBet({{ max_bet }})">MAX</button>
+                </div>
+                <div class="selected-bet">
+                    Bet: <span id="current-bet-type">Red</span>
+                </div>
             </div>
-            <div class="selected-bet">
-                Bet: <span id="current-bet-type">Red</span>
-            </div>
+            <button class="action-btn spin-btn" id="spin-btn" onclick="spinWheel()">
+                <span class="btn-icon">🎡</span> SPIN
+            </button>
         </div>
-        <button class="action-btn spin-btn" id="spin-btn" onclick="spinWheel()">🎡 SPIN</button>
+
+        <style>
+            /* Roulette Specifics */
+            .bet-type-selector,
+            .dozen-bets {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 10px;
+                margin-bottom: 20px;
+            }
+
+            .bet-type-btn,
+            .dozen-btn {
+                background: var(--bg-panel);
+                border: 1px solid var(--glass-border);
+                color: var(--text-dim);
+                padding: 10px 15px;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.2s;
+                font-size: 0.9rem;
+                min-width: 80px;
+            }
+
+            .bet-type-btn:hover,
+            .dozen-btn:hover {
+                border-color: var(--primary);
+                color: var(--text-main);
+                transform: translateY(-2px);
+            }
+
+            .bet-type-btn.active,
+            .dozen-btn.active {
+                background: rgba(0, 242, 234, 0.15);
+                border-color: var(--primary);
+                color: var(--primary);
+                box-shadow: 0 0 15px rgba(0, 242, 234, 0.2);
+            }
+
+            .straight-bet {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                background: var(--glass);
+                padding: 15px;
+                border-radius: 12px;
+                max-width: fit-content;
+                margin: 0 auto;
+            }
+
+            .straight-bet input {
+                background: rgba(0, 0, 0, 0.3);
+                border: 1px solid var(--glass-border);
+                color: var(--text-main);
+                padding: 8px;
+                border-radius: 6px;
+                width: 80px;
+                text-align: center;
+            }
+
+            /* Quick Actions & Balance Pill (Copied from Slots) */
+            .bet-input-wrapper {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .bet-quick-actions {
+                display: flex;
+                gap: 0.5rem;
+                margin-top: 0.5rem;
+            }
+
+            .quick-bet-btn {
+                background: var(--glass);
+                border: 1px solid var(--glass-border);
+                color: var(--text-dim);
+                border-radius: 4px;
+                padding: 2px 8px;
+                font-size: 0.7rem;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .quick-bet-btn:hover {
+                background: var(--primary);
+                color: #000;
+            }
+
+            .balance-pill {
+                background: var(--glass);
+                border: 1px solid var(--glass-border);
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                min-width: 100px;
+            }
+
+            .balance-pill .label {
+                font-size: 0.65rem;
+                color: var(--text-dim);
+                font-weight: 700;
+                letter-spacing: 1px;
+            }
+
+            .balance-pill .value {
+                font-size: 1.1rem;
+                color: var(--primary);
+                font-family: 'JetBrains Mono', monospace;
+                font-weight: 700;
+                line-height: 1;
+            }
+        </style>
     </div>
-</div>
-{% endblock %}
+    {% endblock %}
 
-{% block scripts %}
-<script>
-    const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
-    let currentBetType = 'red';
-    let currentBetValue = '';
-    let isSpinning = false;
+    {% block scripts %}
+    <script>
+        const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+        let currentBetType = 'red';
+        let currentBetValue = '';
+        let isSpinning = false;
 
-    function adjustBet(amount) {
-        const input = document.getElementById('bet-amount');
-        const newValue = Math.max({{ min_bet }}, Math.min({{ max_bet }}, parseInt(input.value || 0) + amount));
-    input.value = newValue;
-}
-
-    function selectBetType(type, value) {
-        currentBetType = type;
-        currentBetValue = value;
-
-        playSound('click');
-
-        // Update UI
-        document.querySelectorAll('.bet-type-btn, .dozen-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.type === type && (!value || btn.dataset.value === value)) {
-                btn.classList.add('active');
+        // Init balance display
+        document.addEventListener('DOMContentLoaded', () => {
+            const globalBal = document.getElementById('credits-balance');
+            const gameBal = document.getElementById('game-balance');
+            if (globalBal && gameBal) {
+                gameBal.textContent = globalBal.textContent;
+                const observer = new MutationObserver(() => { gameBal.textContent = globalBal.textContent; });
+                observer.observe(globalBal, { childList: true, characterData: true, subtree: true });
             }
         });
 
-        let displayText = type.charAt(0).toUpperCase() + type.slice(1);
-        if (value) displayText += ` (${value})`;
-        document.getElementById('current-bet-type').textContent = displayText;
-    }
-
-    function getColorClass(number) {
-        if (number === 0) return 'green';
-        return RED_NUMBERS.includes(number) ? 'red' : 'black';
-    }
-
-    async function spinWheel() {
-        if (isSpinning) return;
-
-        const bet = parseFloat(document.getElementById('bet-amount').value);
-        const spinBtn = document.getElementById('spin-btn');
-        const resultEl = document.getElementById('spin-result');
-        const wheel = document.getElementById('wheel');
-        const resultNumber = document.getElementById('result-number');
-
-        isSpinning = true;
-        spinBtn.disabled = true;
-        spinBtn.textContent = '🎡 SPINNING...';
-        resultEl.textContent = '';
-        resultEl.className = 'spin-result';
-
-        // Spin animation and sound
-        wheel.classList.add('spinning');
-        resultNumber.textContent = '?';
-        resultNumber.className = '';
-        playSound('wheelSpin');
-
-        try {
-            const response = await fetch('/api/games/roulette/spin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    bet,
-                    bet_type: currentBetType,
-                    bet_value: currentBetValue
-                })
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.detail || 'Spin failed');
-            }
-
-            // Wait for spin animation
-            await new Promise(r => setTimeout(r, 2500));
-
-            wheel.classList.remove('spinning');
-            playSound('ballLand');
-
-            // Show result
-            resultNumber.textContent = data.number;
-            resultNumber.className = getColorClass(data.number);
-
-            if (data.win) {
-                resultEl.innerHTML = `🎉 <span class="${data.color}">${data.number}</span> - YOU WIN! +${data.payout} CR (${data.multiplier}x)`;
-                resultEl.classList.add('win');
-                playSound('win');
-            } else {
-                resultEl.innerHTML = `<span class="${data.color}">${data.number}</span> - No win`;
-                resultEl.classList.add('lose');
-                playSound('lose');
-            }
-
-            updateBalance(data.balance);
-
-        } catch (error) {
-            wheel.classList.remove('spinning');
-            resultEl.textContent = '❌ ' + error.message;
-            resultEl.classList.add('error');
-            playSound('error');
+        function adjustBet(amount) {
+            const input = document.getElementById('bet-amount');
+            let val = parseInt(input.value || 0) + amount;
+            setBet(val);
         }
 
-        isSpinning = false;
-        spinBtn.disabled = false;
-        spinBtn.textContent = '🎡 SPIN';
-    }
-</script>
-{% endblock %}
+        function setBet(amount) {
+            const input = document.getElementById('bet-amount');
+            const min = {{ min_bet }};
+        const max = {{ max_bet }};
+        input.value = Math.max(min, Math.min(max, amount));
+        }
+
+        function selectBetType(type, value) {
+            currentBetType = type;
+            currentBetValue = value;
+
+            playSound('click');
+
+            // Update UI
+            document.querySelectorAll('.bet-type-btn, .dozen-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.type === type && (!value || btn.dataset.value === value)) {
+                    btn.classList.add('active');
+                }
+            });
+
+            let displayText = type.charAt(0).toUpperCase() + type.slice(1);
+            if (value) displayText += ` (${value})`;
+            document.getElementById('current-bet-type').textContent = displayText;
+        }
+
+        function getColorClass(number) {
+            if (number === 0) return 'green';
+            return RED_NUMBERS.includes(number) ? 'red' : 'black';
+        }
+
+        async function spinWheel() {
+            if (isSpinning) return;
+
+            const bet = parseFloat(document.getElementById('bet-amount').value);
+            const spinBtn = document.getElementById('spin-btn');
+            const resultEl = document.getElementById('spin-result');
+            const wheel = document.getElementById('wheel');
+            const resultNumber = document.getElementById('result-number');
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            spinBtn.textContent = '🎡 SPINNING...';
+            resultEl.textContent = '';
+            resultEl.className = 'spin-result';
+
+            // Spin animation and sound
+            wheel.classList.add('spinning');
+            resultNumber.textContent = '?';
+            resultNumber.className = '';
+            playSound('wheelSpin');
+
+            try {
+                const response = await fetch('/api/games/roulette/spin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bet,
+                        bet_type: currentBetType,
+                        bet_value: currentBetValue
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    let msg = data.detail || 'Spin failed';
+                    if (Array.isArray(msg)) msg = msg.map(e => e.msg).join(', ');
+                    else if (typeof msg === 'object') msg = JSON.stringify(msg);
+                    throw new Error(msg);
+                }
+
+                // Wait for spin animation
+                await new Promise(r => setTimeout(r, 2500));
+
+                wheel.classList.remove('spinning');
+                playSound('ballLand');
+
+                // Show result
+                resultNumber.textContent = data.number;
+                resultNumber.className = getColorClass(data.number);
+
+                if (data.win) {
+                    resultEl.innerHTML = `🎉 <span class="${data.color}">${data.number}</span> - YOU WIN! +${data.payout} CR (${data.multiplier}x)`;
+                    resultEl.classList.add('win');
+                    playSound('win');
+                } else {
+                    resultEl.innerHTML = `<span class="${data.color}">${data.number}</span> - No win`;
+                    resultEl.classList.add('lose');
+                    playSound('lose');
+                }
+
+                updateBalance(data.balance);
+
+            } catch (error) {
+                wheel.classList.remove('spinning');
+                resultEl.textContent = '❌ ' + error.message;
+                resultEl.classList.add('error');
+                playSound('error');
+            }
+
+            isSpinning = false;
+            spinBtn.disabled = false;
+            spinBtn.textContent = '🎡 SPIN';
+        }
+    </script>
+    {% endblock %}

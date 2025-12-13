@@ -1,0 +1,416 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="game-container scratch-cards-game">
+    <!-- Premium Game Header -->
+    <div class="game-header">
+        <div class="header-left">
+            <a href="/" class="back-link">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                BACK
+            </a>
+        </div>
+        <div class="header-center">
+            <h2><span class="pulse-icon">🎟️</span> SCRATCH CARDS</h2>
+        </div>
+        <div class="header-right">
+            <div class="balance-pill">
+                <span class="label">CREDITS</span>
+                <span class="value" id="game-balance">---</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="scratch-card" id="scratch-card">
+            <div class="scratch-grid" id="scratch-grid">
+                <!-- 9 cells will be populated dynamically -->
+                <div class="scratch-cell hidden" data-index="0">?</div>
+                <div class="scratch-cell hidden" data-index="1">?</div>
+                <div class="scratch-cell hidden" data-index="2">?</div>
+                <div class="scratch-cell hidden" data-index="3">?</div>
+                <div class="scratch-cell hidden" data-index="4">?</div>
+                <div class="scratch-cell hidden" data-index="5">?</div>
+                <div class="scratch-cell hidden" data-index="6">?</div>
+                <div class="scratch-cell hidden" data-index="7">?</div>
+                <div class="scratch-cell hidden" data-index="8">?</div>
+            </div>
+        </div>
+
+        <div id="game-result" class="game-result"></div>
+    </div>
+
+    <div class="game-info">
+        <p>Match 3 of the same multiplier to win!</p>
+        <div class="prize-table">
+            <span class="prize">0.5x</span>
+            <span class="prize">1x</span>
+            <span class="prize">2x</span>
+            <span class="prize">5x</span>
+            <span class="prize">10x</span>
+            <span class="prize rare">50x</span>
+        </div>
+    </div>
+
+    <div class="game-controls">
+        <div class="bet-controls">
+            <label>CARD PRICE</label>
+            <div class="bet-input-wrapper">
+                <button class="bet-adjust" onclick="adjustBet(-5); playSound('click');">-</button>
+                <input type="number" id="bet-amount" value="{{ min_bet }}" min="{{ min_bet }}" max="{{ max_bet }}">
+                <button class="bet-adjust" onclick="adjustBet(5); playSound('click');">+</button>
+            </div>
+            <div class="bet-quick-actions">
+                <button class="quick-bet-btn" onclick="setBet({{ min_bet }})">MIN</button>
+                <button class="quick-bet-btn" onclick="setBet({{ max_bet }})">MAX</button>
+            </div>
+        </div>
+        <button class="action-btn buy-btn" id="buy-btn" onclick="buyCard()">
+            <span class="btn-icon">🎟️</span> BUY CARD
+        </button>
+    </div>
+
+    <style>
+        /* Quick Actions & Balance Pill (Copied from Slots) */
+        .bet-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .bet-quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .quick-bet-btn {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: var(--text-dim);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-bet-btn:hover {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .balance-pill {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            min-width: 100px;
+        }
+
+        .balance-pill .label {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .balance-pill .value {
+            font-size: 1.1rem;
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            line-height: 1;
+        }
+    </style>
+</div>
+
+<style>
+    .scratch-cards-game .scratch-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        padding: 20px;
+        margin: 20px auto;
+        max-width: 320px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .scratch-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    .scratch-cell {
+        aspect-ratio: 1;
+        background: linear-gradient(145deg, #3a3a3a, #2a2a2a);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #ffd700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .scratch-cell.hidden {
+        background: linear-gradient(145deg, #555, #444);
+        color: #888;
+    }
+
+    .scratch-cell.hidden:hover {
+        transform: scale(1.05);
+        background: linear-gradient(145deg, #666, #555);
+    }
+
+    .scratch-cell.revealed {
+        animation: reveal 0.5s ease;
+    }
+
+    .scratch-cell.winner {
+        background: linear-gradient(145deg, #4CAF50, #388E3C);
+        box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+        animation: pulse 0.5s ease infinite alternate;
+    }
+
+    .scratch-cell.loser {
+        background: linear-gradient(145deg, #333, #222);
+        color: #666;
+    }
+
+    @keyframes reveal {
+        0% {
+            transform: rotateY(0deg);
+        }
+
+        50% {
+            transform: rotateY(90deg);
+        }
+
+        100% {
+            transform: rotateY(0deg);
+        }
+    }
+
+    @keyframes pulse {
+        from {
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        to {
+            box-shadow: 0 0 30px rgba(76, 175, 80, 0.8);
+        }
+    }
+
+    .prize-table {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+
+    .prize {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+    }
+
+    .prize.rare {
+        background: linear-gradient(135deg, #ffd700, #ff8c00);
+        color: #000;
+        font-weight: bold;
+    }
+
+    .game-result {
+        text-align: center;
+        font-size: 1.3rem;
+        margin: 15px 0;
+        min-height: 40px;
+    }
+
+    .game-result.win {
+        color: #4CAF50;
+    }
+
+    .game-result.lose {
+        color: #f44336;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let isPlaying = false;
+    let cardData = null;
+    let revealedCount = 0;
+
+    // Init balance display
+    document.addEventListener('DOMContentLoaded', () => {
+        const globalBal = document.getElementById('credits-balance');
+        const gameBal = document.getElementById('game-balance');
+        if (globalBal && gameBal) {
+            gameBal.textContent = globalBal.textContent;
+            const observer = new MutationObserver(() => { gameBal.textContent = globalBal.textContent; });
+            observer.observe(globalBal, { childList: true, characterData: true, subtree: true });
+        }
+    });
+
+    function adjustBet(amount) {
+        const input = document.getElementById('bet-amount');
+        let val = parseInt(input.value || 0) + amount;
+        setBet(val);
+    }
+
+    function setBet(amount) {
+        const input = document.getElementById('bet-amount');
+        const min = {{ min_bet }};
+    const max = {{ max_bet }};
+    input.value = Math.max(min, Math.min(max, amount));
+    }
+
+    async function buyCard() {
+        if (isPlaying) return;
+
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        const buyBtn = document.getElementById('buy-btn');
+        const resultEl = document.getElementById('game-result');
+
+        isPlaying = true;
+        buyBtn.disabled = true;
+        buyBtn.textContent = '🎟️ BUYING...';
+        resultEl.textContent = '';
+        resultEl.className = 'game-result';
+        revealedCount = 0;
+
+        // Reset cells
+        document.querySelectorAll('.scratch-cell').forEach(cell => {
+            cell.className = 'scratch-cell hidden';
+            cell.textContent = '?';
+        });
+
+        try {
+            const response = await fetch('/api/games/scratch-cards/buy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bet })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                let msg = data.detail || 'Purchase failed';
+                if (Array.isArray(msg)) msg = msg.map(e => e.msg).join(', ');
+                else if (typeof msg === 'object') msg = JSON.stringify(msg);
+                throw new Error(msg);
+            }
+
+            cardData = data;
+            playSound('click');
+
+            // Enable cell clicking
+            document.querySelectorAll('.scratch-cell').forEach(cell => {
+                cell.onclick = () => revealCell(parseInt(cell.dataset.index));
+            });
+
+            buyBtn.textContent = '👆 SCRATCH TO REVEAL';
+            updateBalance(data.balance);
+
+        } catch (error) {
+            resultEl.textContent = '❌ ' + error.message;
+            resultEl.classList.add('error');
+            playSound('error');
+            isPlaying = false;
+            buyBtn.disabled = false;
+            buyBtn.innerHTML = '<span class="btn-icon">🎟️</span> BUY CARD';
+        }
+    }
+
+    function revealCell(index) {
+        if (!cardData || !isPlaying) return;
+
+        const cell = document.querySelector(`.scratch-cell[data-index="${index}"]`);
+        if (!cell.classList.contains('hidden')) return;
+
+        cell.classList.remove('hidden');
+        cell.classList.add('revealed');
+
+        const multiplier = cardData.cells[index];
+        cell.textContent = multiplier === '0' ? '💀' : `${multiplier}x`;
+
+        playSound('scratch');
+        revealedCount++;
+
+        // Check if all revealed
+        if (revealedCount === 9) {
+            showFinalResult();
+        }
+    }
+
+    function revealAll() {
+        if (!cardData) return;
+
+        cardData.cells.forEach((mult, index) => {
+            const cell = document.querySelector(`.scratch-cell[data-index="${index}"]`);
+            if (cell.classList.contains('hidden')) {
+                cell.classList.remove('hidden');
+                cell.classList.add('revealed');
+                cell.textContent = mult === '0' ? '💀' : `${mult}x`;
+            }
+        });
+        revealedCount = 9;
+        showFinalResult();
+    }
+
+    function showFinalResult() {
+        const resultEl = document.getElementById('game-result');
+        const buyBtn = document.getElementById('buy-btn');
+
+        // Highlight winning cells
+        if (cardData.winning_positions && cardData.winning_positions.length > 0) {
+            cardData.winning_positions.forEach(pos => {
+                const cell = document.querySelector(`.scratch-cell[data-index="${pos}"]`);
+                cell.classList.add('winner');
+            });
+        }
+
+        // Mark non-winning cells as losers
+        document.querySelectorAll('.scratch-cell').forEach((cell, idx) => {
+            if (!cardData.winning_positions.includes(idx)) {
+                cell.classList.add('loser');
+            }
+        });
+
+        if (cardData.win) {
+            resultEl.innerHTML = `🎉 <strong>YOU WIN!</strong> ${cardData.multiplier}x = +${cardData.payout} CR`;
+            resultEl.classList.add('win');
+            playSound('win');
+        } else {
+            resultEl.innerHTML = `😔 No match - Better luck next time!`;
+            resultEl.classList.add('lose');
+            playSound('lose');
+        }
+
+        isPlaying = false;
+        buyBtn.disabled = false;
+        buyBtn.innerHTML = '<span class="btn-icon">🎟️</span> BUY CARD';
+        cardData = null;
+
+        // Disable cell clicking
+        document.querySelectorAll('.scratch-cell').forEach(cell => {
+            cell.onclick = null;
+        });
+    }
+
+
+</script>
+{% endblock %}

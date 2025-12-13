@@ -49,6 +49,144 @@
             "enabled": true,
             "min_bet": 1,
             "max_bet": 10000
+        },
+        "scratch_cards": {
+            "enabled": true,
+            "min_bet": 5,
+            "max_bet": 100,
+            "prize_weights": {
+                "0": 40,
+                "0.5": 25,
+                "1": 20,
+                "2": 10,
+                "5": 3,
+                "10": 1.5,
+                "50": 0.5
+            }
+        },
+        "highlow": {
+            "enabled": true,
+            "min_bet": 5,
+            "max_bet": 500,
+            "streak_multipliers": [
+                1,
+                1.5,
+                2,
+                3,
+                5,
+                10,
+                20,
+                50
+            ]
+        },
+        "dice": {
+            "enabled": true,
+            "min_bet": 1,
+            "max_bet": 1000
+        },
+        "wheel": {
+            "enabled": true,
+            "min_bet": 10,
+            "max_bet": 500,
+            "segments": [
+                {
+                    "multiplier": 0,
+                    "weight": 10,
+                    "color": "#333333"
+                },
+                {
+                    "multiplier": 0.5,
+                    "weight": 15,
+                    "color": "#666666"
+                },
+                {
+                    "multiplier": 1,
+                    "weight": 30,
+                    "color": "#888888"
+                },
+                {
+                    "multiplier": 2,
+                    "weight": 20,
+                    "color": "#4CAF50"
+                },
+                {
+                    "multiplier": 5,
+                    "weight": 15,
+                    "color": "#2196F3"
+                },
+                {
+                    "multiplier": 10,
+                    "weight": 7,
+                    "color": "#9C27B0"
+                },
+                {
+                    "multiplier": 25,
+                    "weight": 2.5,
+                    "color": "#FF9800"
+                },
+                {
+                    "multiplier": 100,
+                    "weight": 0.5,
+                    "color": "#FFD700"
+                }
+            ]
+        },
+        "number_guess": {
+            "enabled": true,
+            "min_bet": 1,
+            "max_bet": 200,
+            "payouts": {
+                "exact": 50,
+                "off_1": 10,
+                "off_2_5": 5,
+                "off_6_10": 2,
+                "off_11_20": 1
+            }
+        },
+        "lottery": {
+            "enabled": true,
+            "min_bet": 0,
+            "max_bet": 0
+        }
+    },
+    "lottery": {
+        "enabled": true,
+        "ticket_price": 10.0,
+        "max_tickets_per_user": 100,
+        "numbers_to_pick": 6,
+        "number_range_max": 49,
+        "draw_schedule": "first_friday",
+        "draw_hour": 12,
+        "draw_minute": 0,
+        "timezone": "America/Chicago",
+        "initial_jackpot": 10000.0,
+        "jackpot_contribution_percent": 70.0,
+        "prize_tiers": {
+            "6": "jackpot",
+            "5": 5000,
+            "4": 500,
+            "3": 25,
+            "2": "free_ticket"
+        },
+        "lump_sum_percent": 50.0,
+        "installment_weeks": 5,
+        "installment_days": [
+            "monday",
+            "wednesday",
+            "friday"
+        ],
+        "installment_hour": 12,
+        "installment_minute": 0,
+        "progressive_odds": {
+            "enabled": true,
+            "force_winner_after_months": 2,
+            "month_1_no_winner_boost": 0.5,
+            "month_2_guaranteed": true
+        },
+        "multiple_winners": {
+            "default_split": "50/50",
+            "coin_flip_enabled": true,
+            "coin_flip_agreement_hours": 24
         }
     },
     "gamble_friday": {
