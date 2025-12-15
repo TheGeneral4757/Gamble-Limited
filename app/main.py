@@ -156,7 +156,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         user_id = int(user_id) if user_id and user_id != "0" else None
-    except:
+    except Exception:
         user_id = None
 
     await ws_manager.connect(websocket, user_id)

@@ -366,7 +366,7 @@ class Database:
                         "banned_until": user["banned_until"],
                         "ban_reason": user.get("ban_reason", "No reason specified"),
                     }
-            except:
+            except Exception:
                 pass
 
         # Update last active
@@ -743,7 +743,7 @@ class Database:
             penalty = min(0.15, total / 10000)  # 15% max at 1500+ converted
             return penalty
 
-        except:
+        except Exception:
             return 0.0
 
     # ==================== Game Stats ====================

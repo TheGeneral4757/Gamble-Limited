@@ -54,7 +54,7 @@ async def user_login(
         try:
             ban_time = datetime.fromisoformat(user["banned_until"])
             ban_str = ban_time.strftime("%Y-%m-%d %H:%M")
-        except:
+        except Exception:
             ban_str = user["banned_until"]
 
         return templates.TemplateResponse(

@@ -78,7 +78,7 @@ class LotteryScheduler:
             # Better logic:
             # Check the draw_id (YYYY-MM). If it matches current month and we are past the day/hour, run it.
 
-            config = lottery_system._get_config()
+            lottery_system._get_config()
             tz = lottery_system._get_timezone()
             now = datetime.now(tz)
 

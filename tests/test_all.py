@@ -97,7 +97,7 @@ def run_database_tests():
 
         # Check login returns banned status
         user = db.login_user(username)
-        assert user.get("banned") == True, "User should be banned"
+        assert user.get("banned"), "User should be banned"
 
     @test("Unban user")
     def test_unban():
@@ -110,7 +110,7 @@ def run_database_tests():
         db.unban_user(user_id)
 
         user = db.login_user(username)
-        assert user.get("banned") != True, "User should not be banned"
+        assert not user.get("banned"), "User should not be banned"
 
     @test("Daily bonus claim")
     def test_daily_bonus():
@@ -294,7 +294,6 @@ def run_websocket_tests():
         history = getattr(
             ws_manager, "chat_history", getattr(ws_manager, "_chat_history", [])
         )
-        initial_len = len(history)
         # Just check that it's a list-like structure
         assert hasattr(history, "__len__"), "Chat history should be iterable"
 

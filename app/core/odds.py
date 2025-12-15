@@ -39,7 +39,7 @@ def load_odds(force_reload: bool = False) -> Dict[str, Any]:
             file_mtime = datetime.fromtimestamp(ODDS_FILE.stat().st_mtime)
             if _last_load_time and file_mtime <= _last_load_time:
                 return _odds_cache
-        except:
+        except Exception:
             pass
 
     # Load from file

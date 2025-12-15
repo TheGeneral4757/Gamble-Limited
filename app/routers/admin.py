@@ -295,11 +295,11 @@ async def get_logs(
                 # Filter by level if specified
                 if level != "all":
                     level_upper = level.upper()
-                    all_lines = [l for l in all_lines if level_upper in l]
+                    all_lines = [line for line in all_lines if level_upper in line]
 
                 # Get last N lines
                 logs = all_lines[-lines:]
-                logs = [l.strip() for l in logs]
+                logs = [line.strip() for line in logs]
         else:
             logs = [
                 "Log file not found. Enable file logging in config: logging.log_to_file = true"
