@@ -5,6 +5,7 @@ Provides colored console output and optional file logging with rotation.
 
 import logging
 import sys
+import json
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from typing import Optional
@@ -54,13 +55,35 @@ class PlainFormatter(logging.Formatter):
         return f"{timestamp} | {record.levelname:<8} | {record.name} | {record.getMessage()}"
 
 
+class JsonFormatter(logging.Formatter):
+    """Formatter for structured logging in JSON format."""
+
+    def format(self, record):
+        log_record = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S.%f%z"),
+            "level": record.levelname,
+            "name": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            log_record["exc_info"] = self.formatException(record.exc_info)
+
+        # Add extra fields passed to the logger
+        extra_fields = {k: v for k, v in record.__dict__.items() if k not in logging.LogRecord.__dict__}
+        if extra_fields:
+            log_record.update(extra_fields)
+
+        return json.dumps(log_record)
+
+
 def setup_logger(
     name: str = "rng-thing",
     level: str = "INFO",
     log_to_file: bool = False,
     log_file_path: Optional[Path] = None,
     max_file_size: int = 5 * 1024 * 1024,  # 5MB
-    backup_count: int = 3
+    backup_count: int = 3,
+    formatter: str = "color"
 ) -> logging.Logger:
     """
     Set up and configure a logger.
@@ -86,7 +109,12 @@ def setup_logger(
     
     # Console handler with colors
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(ColoredFormatter())
+
+    if formatter == "json":
+        console_handler.setFormatter(JsonFormatter())
+    else:
+        console_handler.setFormatter(ColoredFormatter())
+
     logger.addHandler(console_handler)
     
     # Optional file handler
@@ -139,7 +167,7 @@ def get_logger(name: str = None) -> logging.Logger:
     return _app_logger
 
 
-def init_logging(level: str = "INFO", log_to_file: bool = False):
+def init_logging(level: str = "INFO", log_to_file: bool = False, formatter: str = "color"):
     """
     Initialize the application logging system.
     Should be called once at application startup.
@@ -149,5 +177,5 @@ def init_logging(level: str = "INFO", log_to_file: bool = False):
         log_to_file: Whether to enable file logging
     """
     global _app_logger
-    _app_logger = setup_logger(level=level, log_to_file=log_to_file)
+    _app_logger = setup_logger(level=level, log_to_file=log_to_file, formatter=formatter)
     _app_logger.info(f"Logging initialized at {level} level")
