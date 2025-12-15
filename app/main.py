@@ -19,6 +19,8 @@ import json
 
 from app.core.logger import init_logging, get_logger
 from app.config import settings, PROJECT_ROOT
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 # Initialize logging first
 init_logging(
@@ -72,37 +74,49 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 # ==================== Application Setup ====================
 
-app = FastAPI(
-    title=settings.server.name,
-    docs_url="/docs" if settings.server.debug else None,
-    redoc_url=None
-)
-
-# Add security headers middleware
-app.add_middleware(SecurityHeadersMiddleware)
-
-# CORS middleware (for development)
-if settings.server.debug:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title=settings.server.name,
+        docs_url="/docs" if settings.server.debug else None,
+        redoc_url=None
     )
 
-# Static files
-static_path = PROJECT_ROOT / "app" / "static"
-if static_path.exists():
-    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
-else:
-    logger.warning(f"Static directory not found: {static_path}")
+    # Add slowapi rate limiter
+    from app.routers.api import limiter
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Include routers
-app.include_router(auth_router)
-app.include_router(pages.router)
-app.include_router(api.router, prefix="/api")
-app.include_router(admin.router, prefix="/admin")
+    # Add security headers middleware
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    # CORS middleware (for development)
+    if settings.server.debug:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    # Static files
+    static_path = PROJECT_ROOT / "app" / "static"
+    if static_path.exists():
+        app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+    else:
+        logger.warning(f"Static directory not found: {static_path}")
+
+    # Include routers
+    app.include_router(auth_router)
+    app.include_router(pages.router)
+    app.include_router(api.router, prefix="/api")
+    app.include_router(admin.router, prefix="/admin")
+
+    return app
+
+app = create_app()
+
 
 # Start Lottery Scheduler
 from app.core.scheduler import lottery_scheduler

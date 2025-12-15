@@ -20,7 +20,16 @@ from app.core.logger import get_logger
 try:
     from slowapi import Limiter
     from slowapi.util import get_remote_address
-    limiter = Limiter(key_func=get_remote_address)
+
+    def get_user_id_key(request: Request) -> str:
+        """
+        Use the user_id from the cookie as the rate limit key.
+        Fallback to the remote address if the user is not logged in.
+        """
+        user_id = request.cookies.get("user_id")
+        return user_id or get_remote_address(request)
+
+    limiter = Limiter(key_func=get_user_id_key)
     RATE_LIMIT_AVAILABLE = True
 except ImportError:
     RATE_LIMIT_AVAILABLE = False
@@ -114,7 +123,7 @@ def validate_bet(user_id: int, bet: float, game: str, is_admin: bool = False, us
     
     return {"valid": True}
 
-def get_rate_limit():
+def get_rate_limit() -> str:
     """Get rate limit string from config."""
     return settings.rate_limit.game_requests if settings.rate_limit.enabled else "1000/minute"
 
@@ -208,6 +217,7 @@ async def get_leaderboard():
 
 
 @router.post("/games/slots/spin")
+@limiter.limit(get_rate_limit)
 async def slots_spin(request: Request, data: BetRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -235,6 +245,7 @@ async def slots_spin(request: Request, data: BetRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/blackjack/deal")
+@limiter.limit(get_rate_limit)
 async def blackjack_deal(request: Request, data: BlackjackActionRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -262,6 +273,7 @@ async def blackjack_deal(request: Request, data: BlackjackActionRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/blackjack/hit")
+@limiter.limit(get_rate_limit)
 async def blackjack_hit(request: Request, data: BlackjackActionRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -284,6 +296,7 @@ async def blackjack_hit(request: Request, data: BlackjackActionRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/blackjack/stand")
+@limiter.limit(get_rate_limit)
 async def blackjack_stand(request: Request, data: BlackjackActionRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -306,6 +319,7 @@ async def blackjack_stand(request: Request, data: BlackjackActionRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/roulette/spin")
+@limiter.limit(get_rate_limit)
 async def roulette_spin(request: Request, data: RouletteRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -329,6 +343,7 @@ async def roulette_spin(request: Request, data: RouletteRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/plinko/drop")
+@limiter.limit(get_rate_limit)
 async def plinko_drop(request: Request, data: PlinkoRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -352,6 +367,7 @@ async def plinko_drop(request: Request, data: PlinkoRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/coinflip/flip")
+@limiter.limit(get_rate_limit)
 async def coinflip_flip(request: Request, data: CoinflipRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -377,6 +393,7 @@ async def coinflip_flip(request: Request, data: CoinflipRequest):
 # ==================== New Game Endpoints ====================
 
 @router.post("/games/scratch-cards/buy")
+@limiter.limit(get_rate_limit)
 async def scratch_cards_buy(request: Request, data: BetRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -400,6 +417,7 @@ async def scratch_cards_buy(request: Request, data: BetRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/highlow/start")
+@limiter.limit(get_rate_limit)
 async def highlow_start(request: Request, data: BetRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -418,6 +436,7 @@ async def highlow_start(request: Request, data: BetRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/highlow/guess")
+@limiter.limit(get_rate_limit)
 async def highlow_guess(request: Request, data: HighLowGuessRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -431,6 +450,7 @@ async def highlow_guess(request: Request, data: HighLowGuessRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/highlow/cashout")
+@limiter.limit(get_rate_limit)
 async def highlow_cashout(request: Request, data: HighLowCashoutRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -448,6 +468,7 @@ async def highlow_cashout(request: Request, data: HighLowCashoutRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/dice/roll")
+@limiter.limit(get_rate_limit)
 async def dice_roll(request: Request, data: DiceRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -474,6 +495,7 @@ async def dice_roll(request: Request, data: DiceRequest):
     return {**result, "balance": balance}
 
 @router.post("/games/number-guess/guess")
+@limiter.limit(get_rate_limit)
 async def number_guess(request: Request, data: NumberGuessRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
@@ -593,5 +615,3 @@ async def lottery_draw_admin(request: Request):
     except Exception as e:
         logger.error(f"Manual draw failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
