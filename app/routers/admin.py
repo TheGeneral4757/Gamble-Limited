@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Depends
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from app.core.database import db
 from app.config import settings, PROJECT_ROOT
 from app.core.odds import load_odds, save_odds, reload_odds
@@ -15,30 +15,37 @@ logger = get_logger("admin")
 router = APIRouter()
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "app" / "templates"))
 
+
 # Request models
 class UserActionRequest(BaseModel):
     user_id: int
 
+
 class PasswordChangeRequest(BaseModel):
     new_password: str
+
 
 class GrantFundsRequest(BaseModel):
     user_id: int
     cash: Optional[float] = 0
     credits: Optional[float] = 0
 
+
 class SetBalanceRequest(BaseModel):
     user_id: int
     cash: float
     credits: float
 
+
 class OddsUpdateRequest(BaseModel):
     odds_data: Dict[str, Any]
+
 
 class BanUserRequest(BaseModel):
     user_id: int
     hours: int = 24
     reason: str = "Banned by admin"
+
 
 class SetJackpotRequest(BaseModel):
     amount: float
@@ -50,23 +57,26 @@ async def admin_panel(request: Request):
     user = require_admin(request)
     if not user:
         return RedirectResponse(url="/auth", status_code=303)
-    
+
     users = db.get_all_users()
     stats = db.get_stats()
     game_stats = db.get_game_breakdown()
     leaderboard = db.get_leaderboard()
     current_odds = load_odds()
-    
-    return templates.TemplateResponse("admin.html", {
-        "request": request,
-        "app_name": settings.server.name,
-        "user": user,
-        "users": users,
-        "stats": stats,
-        "game_stats": game_stats,
-        "leaderboard": leaderboard,
-        "current_odds": json.dumps(current_odds, indent=2, ensure_ascii=False)
-    })
+
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "app_name": settings.server.name,
+            "user": user,
+            "users": users,
+            "stats": stats,
+            "game_stats": game_stats,
+            "leaderboard": leaderboard,
+            "current_odds": json.dumps(current_odds, indent=2, ensure_ascii=False),
+        },
+    )
 
 
 @router.post("/api/reset-user")
@@ -81,7 +91,9 @@ async def reset_user(data: UserActionRequest, user: dict = Depends(admin_user)):
 async def delete_user(data: UserActionRequest, user: dict = Depends(admin_user)):
     """Ban a user (delete is now ban)."""
     logger.info(f"Admin banned user {data.user_id}")
-    result = db.ban_user(data.user_id, hours=8760, reason="Account banned by admin")  # 1 year
+    result = db.ban_user(
+        data.user_id, hours=8760, reason="Account banned by admin"
+    )  # 1 year
     return result
 
 
@@ -105,10 +117,18 @@ async def unban_user(data: UserActionRequest, user: dict = Depends(admin_user)):
 async def grant_funds(data: GrantFundsRequest, user: dict = Depends(admin_user)):
     """Grant cash/credits to a user and send WebSocket notification."""
     # Determine gifter name
-    gifter = "THE HOUSE" if user.get("is_house") or user.get("user_type") == "house" else "Administrator"
+    gifter = (
+        "THE HOUSE"
+        if user.get("is_house") or user.get("user_type") == "house"
+        else "Administrator"
+    )
 
-    logger.info(f"{gifter} granted funds to user {data.user_id}: cash={data.cash}, credits={data.credits}")
-    new_balance = db.update_balance(data.user_id, cash_delta=data.cash, credits_delta=data.credits)
+    logger.info(
+        f"{gifter} granted funds to user {data.user_id}: cash={data.cash}, credits={data.credits}"
+    )
+    new_balance = db.update_balance(
+        data.user_id, cash_delta=data.cash, credits_delta=data.credits
+    )
 
     # Send WebSocket notification
     try:
@@ -121,13 +141,18 @@ async def grant_funds(data: GrantFundsRequest, user: dict = Depends(admin_user))
         if data.credits > 0:
             gift_msg.append(f"{data.credits:.2f} credits")
 
-        asyncio.create_task(ws_manager.send_personal(data.user_id, {
-            "type": "gift_notification",
-            "gifter": gifter,
-            "message": f"You received {' and '.join(gift_msg)} from {gifter}!",
-            "cash": data.cash,
-            "credits": data.credits
-        }))
+        asyncio.create_task(
+            ws_manager.send_personal(
+                data.user_id,
+                {
+                    "type": "gift_notification",
+                    "gifter": gifter,
+                    "message": f"You received {' and '.join(gift_msg)} from {gifter}!",
+                    "cash": data.cash,
+                    "credits": data.credits,
+                },
+            )
+        )
     except Exception as e:
         logger.warning(f"Failed to send gift notification: {e}")
 
@@ -137,7 +162,9 @@ async def grant_funds(data: GrantFundsRequest, user: dict = Depends(admin_user))
 @router.post("/api/set-balance")
 async def set_balance(data: SetBalanceRequest, user: dict = Depends(admin_user)):
     """Set exact balance for a user."""
-    logger.info(f"Admin set balance for user {data.user_id}: cash={data.cash}, credits={data.credits}")
+    logger.info(
+        f"Admin set balance for user {data.user_id}: cash={data.cash}, credits={data.credits}"
+    )
     new_balance = db.set_balance(data.user_id, cash=data.cash, credits=data.credits)
     return {"success": True, "balance": new_balance}
 
@@ -159,14 +186,19 @@ async def set_jackpot(data: SetJackpotRequest, user: dict = Depends(admin_user))
 
 
 @router.post("/api/change-password")
-async def change_password(data: PasswordChangeRequest, user: dict = Depends(admin_user)):
+async def change_password(
+    data: PasswordChangeRequest, user: dict = Depends(admin_user)
+):
     """Change admin password."""
     if len(data.new_password) < 4:
         return {"success": False, "error": "Password too short"}
 
     db.set_admin_password(data.new_password)
     logger.info("Admin password changed")
-    return {"success": True, "message": "Password updated. Server restart may be required."}
+    return {
+        "success": True,
+        "message": "Password updated. Server restart may be required.",
+    }
 
 
 @router.get("/api/users")
@@ -190,7 +222,7 @@ async def get_user_details(user_id: int, user: dict = Depends(admin_user)):
         "success": True,
         "user": user_data,
         "transactions": transactions,
-        "game_stats": game_stats
+        "game_stats": game_stats,
     }
 
 
@@ -216,6 +248,7 @@ async def get_game_stats(user: dict = Depends(admin_user)):
 
 
 # ==================== Odds Management ====================
+
 
 @router.get("/api/odds")
 async def get_odds(user: dict = Depends(admin_user)):
@@ -245,8 +278,11 @@ async def reload_odds_endpoint(user: dict = Depends(admin_user)):
 
 # ==================== Logs ====================
 
+
 @router.get("/api/logs")
-async def get_logs(lines: int = 100, level: str = "all", user: dict = Depends(admin_user)):
+async def get_logs(
+    lines: int = 100, level: str = "all", user: dict = Depends(admin_user)
+):
     """Get recent application logs."""
     log_file = PROJECT_ROOT / "data" / "app.log"
     logs = []
@@ -259,13 +295,15 @@ async def get_logs(lines: int = 100, level: str = "all", user: dict = Depends(ad
                 # Filter by level if specified
                 if level != "all":
                     level_upper = level.upper()
-                    all_lines = [l for l in all_lines if level_upper in l]
+                    all_lines = [line for line in all_lines if level_upper in line]
 
                 # Get last N lines
                 logs = all_lines[-lines:]
-                logs = [l.strip() for l in logs]
+                logs = [line.strip() for line in logs]
         else:
-            logs = ["Log file not found. Enable file logging in config: logging.log_to_file = true"]
+            logs = [
+                "Log file not found. Enable file logging in config: logging.log_to_file = true"
+            ]
 
     except Exception as e:
         logs = [f"Error reading logs: {e}"]
