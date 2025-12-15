@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Form, Response
+from fastapi import APIRouter, Request, Form, Response, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
@@ -254,3 +254,8 @@ def require_admin(request: Request):
         return None
     return user
 
+async def admin_user(user: dict = Depends(get_current_user)):
+    """Dependency to require admin user."""
+    if not user or not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return user
