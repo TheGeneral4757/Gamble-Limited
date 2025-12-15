@@ -80,6 +80,18 @@ A full-featured, self-hosted casino gaming platform built with Python and FastAP
 
 ---
 
+## 🧪 Testing
+
+The project includes a custom test suite to verify core functionality, including database operations, game logic, and configuration loading.
+
+To run the tests, execute the following command from the root of the repository:
+```bash
+python -m tests.test_all
+```
+The test script will output the results to the console. All tests should pass before committing code.
+
+---
+
 ## 🐳 Docker Deployment (Recommended for Production)
 
 This guide is for Debian-based Linux distributions like Ubuntu.
