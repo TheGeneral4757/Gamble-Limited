@@ -72,6 +72,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# ==================== UVLoop Integration =====================
+
+try:
+    import uvloop
+    uvloop.install()
+    logger.info("uvloop installed and enabled.")
+except ImportError:
+    logger.info("uvloop not found, using default asyncio event loop.")
+
 # ==================== Application Setup ====================
 
 

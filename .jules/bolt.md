@@ -1,0 +1,3 @@
+## 2025-12-15 - Baseline Performance Boost with uvloop
+**Learning:** For FastAPI applications running on Gunicorn with Uvicorn workers, enabling `uvloop` and `httptools` is a low-risk, high-impact optimization. The change requires modifying `requirements.txt`, the `Dockerfile`, and `app/main.py` to ensure the faster event loop is used in both production and development environments.
+**Action:** In future optimizations, always check if `uvloop` is installed and enabled as a baseline performance improvement before exploring more complex architectural changes.
