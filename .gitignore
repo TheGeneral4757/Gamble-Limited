@@ -34,8 +34,7 @@ env/
 *~
 
 # Data & Database
-
-# Data & Database
+data/*.db
 # data/ (User wants to persist data)
 # *.db
 # *.sqlite
