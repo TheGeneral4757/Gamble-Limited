@@ -23,9 +23,11 @@ from app.config import settings, PROJECT_ROOT
 # Initialize logging first
 init_logging(
     level=settings.logging.level,
-    log_to_file=settings.logging.log_to_file
+    log_to_file=settings.logging.log_to_file,
+    formatter=settings.logging.formatter
 )
 logger = get_logger("main")
+ws_logger = get_logger("websocket")
 
 # Import routers after logging is initialized
 from app.routers import pages, api, admin
@@ -129,6 +131,7 @@ async def websocket_endpoint(websocket: WebSocket):
     cookies = websocket.cookies
     user_id = cookies.get("user_id")
     username = cookies.get("username", "Guest")
+    client_ip = websocket.client.host
     
     try:
         user_id = int(user_id) if user_id and user_id != "0" else None
@@ -136,6 +139,7 @@ async def websocket_endpoint(websocket: WebSocket):
         user_id = None
     
     await ws_manager.connect(websocket, user_id)
+    ws_logger.info("WebSocket connected", extra={"user_id": user_id, "client_ip": client_ip})
     
     try:
         while True:
@@ -159,11 +163,13 @@ async def websocket_endpoint(websocket: WebSocket):
             except json.JSONDecodeError:
                 pass
                 
-    except WebSocketDisconnect:
+    except WebSocketDisconnect as e:
         ws_manager.disconnect(websocket, user_id)
+        ws_logger.info("WebSocket disconnected", extra={"user_id": user_id, "client_ip": client_ip, "code": e.code, "reason": e.reason})
     except Exception as e:
         logger.warning(f"WebSocket error: {e}")
         ws_manager.disconnect(websocket, user_id)
+        ws_logger.error("WebSocket error", extra={"user_id": user_id, "client_ip": client_ip, "error": str(e)})
 
 
 # ==================== Global Exception Handler ====================

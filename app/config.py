@@ -147,6 +147,7 @@ class GambleFridayConfig(BaseModel):
 class LoggingConfig(BaseModel):
     level: str = "INFO"
     log_to_file: bool = False
+    formatter: str = "color"
 
 
 class PathsConfig(BaseModel):
@@ -235,6 +236,8 @@ def load_config() -> AppConfig:
         data.setdefault("logging", {})["level"] = get_env("LOG_LEVEL")
     if get_env("LOG_TO_FILE"):
         data.setdefault("logging", {})["log_to_file"] = get_env_bool("LOG_TO_FILE")
+    if get_env("LOG_FORMATTER"):
+        data.setdefault("logging", {})["formatter"] = get_env("LOG_FORMATTER")
     
     if get_env("RATE_LIMIT_ENABLED"):
         data.setdefault("rate_limit", {})["enabled"] = get_env_bool("RATE_LIMIT_ENABLED", True)
