@@ -2,6 +2,7 @@ import asyncio
 import websockets
 import json
 
+
 async def verify_websocket_logging():
     """
     Connects to the WebSocket, sends a ping, and disconnects to verify logging.
@@ -22,6 +23,7 @@ async def verify_websocket_logging():
             print("WebSocket connection will be closed.")
     except Exception as e:
         print(f"An error occurred: {e}")
+
 
 if __name__ == "__main__":
     print("Running WebSocket logging verification script...")

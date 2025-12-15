@@ -1,6 +1,7 @@
 import secrets
 import random
 
+
 class TrueRNG:
     """
     A wrapper around Python's `secrets` module to provide cryptographically strong
@@ -36,5 +37,6 @@ class TrueRNG:
         shuffled_deck = deck[:]
         random.SystemRandom().shuffle(shuffled_deck)
         return shuffled_deck
+
 
 rng = TrueRNG()

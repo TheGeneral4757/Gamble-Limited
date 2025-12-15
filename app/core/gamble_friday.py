@@ -5,12 +5,13 @@ Fridays from 6:00 AM to 6:00 PM Chicago time:
 - Higher max bets (3x)
 - Slightly reduced win rates (except coinflip)
 """
+
 from datetime import datetime
-from typing import Optional
 import os
 
 try:
     import pytz
+
     PYTZ_AVAILABLE = True
 except ImportError:
     PYTZ_AVAILABLE = False
@@ -42,11 +43,11 @@ def is_gamble_friday() -> bool:
     # Test mode override (via environment variable)
     if is_test_friday_mode():
         return True
-    
+
     # Check if feature is enabled
-    if not hasattr(settings, 'gamble_friday') or not settings.gamble_friday.enabled:
+    if not hasattr(settings, "gamble_friday") or not settings.gamble_friday.enabled:
         return False
-    
+
     try:
         if PYTZ_AVAILABLE:
             tz = pytz.timezone(settings.gamble_friday.timezone)
@@ -54,17 +55,17 @@ def is_gamble_friday() -> bool:
         else:
             # Fallback: use local time (may not be accurate)
             now = datetime.now()
-        
+
         # Check if it's Friday (weekday 4)
         if now.weekday() != 4:
             return False
-        
+
         # Check if within time window
         start_hour = settings.gamble_friday.start_hour
         end_hour = settings.gamble_friday.end_hour
-        
+
         return start_hour <= now.hour < end_hour
-        
+
     except Exception:
         return False
 
@@ -74,17 +75,17 @@ def get_friday_config() -> dict:
     Get Gamble Friday configuration values.
     Returns defaults if not configured.
     """
-    if not hasattr(settings, 'gamble_friday'):
+    if not hasattr(settings, "gamble_friday"):
         return {
             "winnings_multiplier": 1.0,
             "win_rate_reduction": 0.0,
-            "max_bet_multiplier": 1
+            "max_bet_multiplier": 1,
         }
-    
+
     return {
         "winnings_multiplier": settings.gamble_friday.winnings_multiplier,
         "win_rate_reduction": settings.gamble_friday.win_rate_reduction,
-        "max_bet_multiplier": settings.gamble_friday.max_bet_multiplier
+        "max_bet_multiplier": settings.gamble_friday.max_bet_multiplier,
     }
 
 
@@ -111,7 +112,7 @@ def get_win_rate_adjustment(game: str = "") -> float:
     """
     if game.lower() == "coinflip":
         return 0.0
-    
+
     if is_gamble_friday():
         config = get_friday_config()
         return -config["win_rate_reduction"]  # Negative = reduce win rate
@@ -119,11 +120,15 @@ def get_win_rate_adjustment(game: str = "") -> float:
 
 
 # Singleton for easy import
-gamble_friday = type('GambleFriday', (), {
-    'is_active': staticmethod(is_gamble_friday),
-    'get_config': staticmethod(get_friday_config),
-    'get_adjusted_max_bet': staticmethod(get_adjusted_max_bet),
-    'get_winnings_multiplier': staticmethod(get_winnings_multiplier),
-    'get_win_rate_adjustment': staticmethod(get_win_rate_adjustment),
-    'set_test_mode': staticmethod(set_test_friday_mode),
-})()
+gamble_friday = type(
+    "GambleFriday",
+    (),
+    {
+        "is_active": staticmethod(is_gamble_friday),
+        "get_config": staticmethod(get_friday_config),
+        "get_adjusted_max_bet": staticmethod(get_adjusted_max_bet),
+        "get_winnings_multiplier": staticmethod(get_winnings_multiplier),
+        "get_win_rate_adjustment": staticmethod(get_win_rate_adjustment),
+        "set_test_mode": staticmethod(set_test_friday_mode),
+    },
+)()
