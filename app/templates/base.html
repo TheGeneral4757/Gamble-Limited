@@ -12,9 +12,27 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
         rel="stylesheet">
+    <style>
+        .skip-to-content {
+            position: absolute;
+            left: -10000px;
+            top: auto;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+        }
+
+        .skip-to-content:focus {
+            position: static;
+            width: auto;
+            height: auto;
+            overflow: visible;
+        }
+    </style>
 </head>
 
 <body>
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
     <div class="app-container">
         <header class="main-header">
             <div class="logo">
@@ -56,7 +74,7 @@
         </div>
         {% endif %}
 
-        <main class="content">
+        <main class="content" id="main-content">
             {% block content %}{% endblock %}
         </main>
 
