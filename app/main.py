@@ -197,8 +197,8 @@ async def websocket_endpoint(websocket: WebSocket):
             extra={
                 "user_id": user_id,
                 "client_ip": client_ip,
-                "code": e.code,
-                "reason": e.reason,
+                "ws_disconnect_code": e.code,
+                "ws_disconnect_reason": e.reason,
             },
         )
     except Exception as e:
