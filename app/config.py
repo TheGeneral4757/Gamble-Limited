@@ -290,7 +290,19 @@ def load_config() -> AppConfig:
                 )
                 data["security"]["admin_password_hash"] = hashed_bytes.decode("utf-8")
 
-    return AppConfig(**data)
+    config = AppConfig(**data)
+
+    # Security validation: Ensure default secret key is not used in production
+    if (
+        not config.server.debug
+        and config.security.secret_key == "CHANGE_THIS_IN_PRODUCTION_PLEASE"
+    ):
+        raise ValueError(
+            "CRITICAL: Default secret_key is in use in a non-debug environment. "
+            "Please set a unique, secure SECRET_KEY in your .env file or config.json."
+        )
+
+    return config
 
 
 def save_config(config: AppConfig):
