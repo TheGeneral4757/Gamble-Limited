@@ -61,6 +61,7 @@ class Database:
                 total_converted REAL DEFAULT 0,
                 last_conversion_time TEXT,
                 last_daily_claim TEXT,
+                claim_in_progress INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 last_active TEXT DEFAULT CURRENT_TIMESTAMP
             )
@@ -247,6 +248,12 @@ class Database:
         if "user_type" not in columns:
             logger.info("Migrating: Adding user_type column")
             cursor.execute("ALTER TABLE users ADD COLUMN user_type TEXT DEFAULT 'user'")
+
+        if "claim_in_progress" not in columns:
+            logger.info("Migrating: Adding claim_in_progress column")
+            cursor.execute(
+                "ALTER TABLE users ADD COLUMN claim_in_progress INTEGER DEFAULT 0"
+            )
 
         # Ensure THE HOUSE user exists
         self._ensure_house_user(cursor)
@@ -494,143 +501,201 @@ class Database:
         """
         Claim daily bonus credits. Returns success/error with details.
         Cooldown and amount are configurable in config.json.
+        This function is protected against race conditions.
         """
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute(
-            "SELECT last_daily_claim, credits FROM users WHERE id = ?", (user_id,)
-        )
-        row = cursor.fetchone()
-
-        if not row:
-            return {"success": False, "error": "User not found"}
-
-        last_claim = row["last_daily_claim"]
-        cooldown_hours = settings.economy.daily_bonus_cooldown_hours
-        bonus_amount = settings.economy.daily_bonus_amount
-
-        # Check cooldown
-        if last_claim:
-            try:
-                last_time = datetime.fromisoformat(last_claim)
-                time_since = (datetime.now() - last_time).total_seconds()
-                cooldown_seconds = cooldown_hours * 3600
-
-                if time_since < cooldown_seconds:
-                    remaining = cooldown_seconds - time_since
-                    hours = int(remaining // 3600)
-                    minutes = int((remaining % 3600) // 60)
-                    return {
-                        "success": False,
-                        "error": f"Daily bonus already claimed. Come back in {hours}h {minutes}m",
-                        "remaining_seconds": int(remaining),
-                    }
-            except Exception as e:
-                logger.warning(f"Error parsing last_daily_claim: {e}")
-
-        # Grant bonus
-        new_credits = row["credits"] + bonus_amount
-        now = datetime.now().isoformat()
-
+        # Atomically acquire a lock on the user's row for claiming
         cursor.execute(
             """
-            UPDATE users SET credits = ?, last_daily_claim = ?, last_active = ?
-            WHERE id = ?
-        """,
-            (new_credits, now, now, user_id),
+            UPDATE users SET claim_in_progress = 1
+            WHERE id = ? AND claim_in_progress = 0
+            """,
+            (user_id,),
         )
         conn.commit()
 
-        # Log transaction
-        self.log_transaction(
-            user_id,
-            "daily_bonus",
-            bonus_amount,
-            new_credits,
-            currency="credits",
-            details="Daily bonus claimed",
-        )
+        # If no rows were updated, a claim is already in progress or user DNE
+        if cursor.rowcount == 0:
+            user = self.get_user_by_id(user_id)
+            if user:
+                return {
+                    "success": False,
+                    "error": "Claim is already in progress. Please wait.",
+                }
+            return {"success": False, "error": "User not found"}
 
-        logger.info(f"User {user_id} claimed daily bonus: {bonus_amount} credits")
+        try:
+            cursor.execute(
+                "SELECT last_daily_claim, credits FROM users WHERE id = ?", (user_id,)
+            )
+            row = cursor.fetchone()
 
-        return {
-            "success": True,
-            "amount": bonus_amount,
-            "new_balance": new_credits,
-            "next_claim_hours": cooldown_hours,
-        }
+            # This check is redundant due to locking, but good for safety
+            if not row:
+                return {"success": False, "error": "User not found"}
+
+            last_claim = row["last_daily_claim"]
+            cooldown_hours = settings.economy.daily_bonus_cooldown_hours
+            bonus_amount = settings.economy.daily_bonus_amount
+
+            # Check cooldown
+            if last_claim:
+                try:
+                    last_time = datetime.fromisoformat(last_claim)
+                    time_since = (datetime.now() - last_time).total_seconds()
+                    cooldown_seconds = cooldown_hours * 3600
+
+                    if time_since < cooldown_seconds:
+                        remaining = cooldown_seconds - time_since
+                        hours = int(remaining // 3600)
+                        minutes = int((remaining % 3600) // 60)
+                        return {
+                            "success": False,
+                            "error": f"Daily bonus already claimed. Come back in {hours}h {minutes}m",
+                            "remaining_seconds": int(remaining),
+                        }
+                except Exception as e:
+                    logger.warning(f"Error parsing last_daily_claim: {e}")
+
+            # Grant bonus
+            new_credits = row["credits"] + bonus_amount
+            now = datetime.now().isoformat()
+
+            cursor.execute(
+                """
+                UPDATE users SET credits = ?, last_daily_claim = ?, last_active = ?
+                WHERE id = ?
+                """,
+                (new_credits, now, now, user_id),
+            )
+            conn.commit()
+
+            # Log transaction
+            self.log_transaction(
+                user_id,
+                "daily_bonus",
+                bonus_amount,
+                new_credits,
+                currency="credits",
+                details="Daily bonus claimed",
+            )
+
+            logger.info(f"User {user_id} claimed daily bonus: {bonus_amount} credits")
+
+            return {
+                "success": True,
+                "amount": bonus_amount,
+                "new_balance": new_credits,
+                "next_claim_hours": cooldown_hours,
+            }
+        finally:
+            # Always release the lock
+            cursor.execute(
+                "UPDATE users SET claim_in_progress = 0 WHERE id = ?", (user_id,)
+            )
+            conn.commit()
 
     def claim_daily_cash(self, user_id: int) -> Dict:
         """
         Claim daily cash bonus. Separate from credits daily bonus.
+        This function is protected against race conditions.
         """
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute(
-            "SELECT last_daily_cash, cash FROM users WHERE id = ?", (user_id,)
-        )
-        row = cursor.fetchone()
-
-        if not row:
-            return {"success": False, "error": "User not found"}
-
-        last_claim = row["last_daily_cash"]
-        cooldown_hours = settings.economy.daily_cash_cooldown_hours
-        bonus_amount = settings.economy.daily_cash_amount
-
-        # Check cooldown
-        if last_claim:
-            try:
-                last_time = datetime.fromisoformat(last_claim)
-                time_since = (datetime.now() - last_time).total_seconds()
-                cooldown_seconds = cooldown_hours * 3600
-
-                if time_since < cooldown_seconds:
-                    remaining = cooldown_seconds - time_since
-                    hours = int(remaining // 3600)
-                    minutes = int((remaining % 3600) // 60)
-                    return {
-                        "success": False,
-                        "error": f"Daily cash already claimed. Come back in {hours}h {minutes}m",
-                        "remaining_seconds": int(remaining),
-                    }
-            except Exception as e:
-                logger.warning(f"Error parsing last_daily_cash: {e}")
-
-        # Grant cash bonus
-        new_cash = row["cash"] + bonus_amount
-        now = datetime.now().isoformat()
-
+        # Atomically acquire a lock on the user's row for claiming
         cursor.execute(
             """
-            UPDATE users SET cash = ?, last_daily_cash = ?, last_active = ?
-            WHERE id = ?
-        """,
-            (new_cash, now, now, user_id),
+            UPDATE users SET claim_in_progress = 1
+            WHERE id = ? AND claim_in_progress = 0
+            """,
+            (user_id,),
         )
         conn.commit()
 
-        # Log transaction
-        self.log_transaction(
-            user_id,
-            "daily_cash",
-            bonus_amount,
-            new_cash,
-            currency="cash",
-            details="Daily cash bonus claimed",
-        )
+        # If no rows were updated, a claim is already in progress or user DNE
+        if cursor.rowcount == 0:
+            user = self.get_user_by_id(user_id)
+            if user:
+                return {
+                    "success": False,
+                    "error": "Claim is already in progress. Please wait.",
+                }
+            return {"success": False, "error": "User not found"}
 
-        logger.info(f"User {user_id} claimed daily cash: {bonus_amount}")
+        try:
+            cursor.execute(
+                "SELECT last_daily_cash, cash FROM users WHERE id = ?", (user_id,)
+            )
+            row = cursor.fetchone()
 
-        return {
-            "success": True,
-            "amount": bonus_amount,
-            "new_balance": new_cash,
-            "currency": "cash",
-            "next_claim_hours": cooldown_hours,
-        }
+            # This check is redundant due to locking, but good for safety
+            if not row:
+                return {"success": False, "error": "User not found"}
+
+            last_claim = row["last_daily_cash"]
+            cooldown_hours = settings.economy.daily_cash_cooldown_hours
+            bonus_amount = settings.economy.daily_cash_amount
+
+            # Check cooldown
+            if last_claim:
+                try:
+                    last_time = datetime.fromisoformat(last_claim)
+                    time_since = (datetime.now() - last_time).total_seconds()
+                    cooldown_seconds = cooldown_hours * 3600
+
+                    if time_since < cooldown_seconds:
+                        remaining = cooldown_seconds - time_since
+                        hours = int(remaining // 3600)
+                        minutes = int((remaining % 3600) // 60)
+                        return {
+                            "success": False,
+                            "error": f"Daily cash already claimed. Come back in {hours}h {minutes}m",
+                            "remaining_seconds": int(remaining),
+                        }
+                except Exception as e:
+                    logger.warning(f"Error parsing last_daily_cash: {e}")
+
+            # Grant cash bonus
+            new_cash = row["cash"] + bonus_amount
+            now = datetime.now().isoformat()
+
+            cursor.execute(
+                """
+                UPDATE users SET cash = ?, last_daily_cash = ?, last_active = ?
+                WHERE id = ?
+                """,
+                (new_cash, now, now, user_id),
+            )
+            conn.commit()
+
+            # Log transaction
+            self.log_transaction(
+                user_id,
+                "daily_cash",
+                bonus_amount,
+                new_cash,
+                currency="cash",
+                details="Daily cash bonus claimed",
+            )
+
+            logger.info(f"User {user_id} claimed daily cash: {bonus_amount}")
+
+            return {
+                "success": True,
+                "amount": bonus_amount,
+                "new_balance": new_cash,
+                "currency": "cash",
+                "next_claim_hours": cooldown_hours,
+            }
+        finally:
+            # Always release the lock
+            cursor.execute(
+                "UPDATE users SET claim_in_progress = 0 WHERE id = ?", (user_id,)
+            )
+            conn.commit()
 
     # ==================== House Balance ====================
 
