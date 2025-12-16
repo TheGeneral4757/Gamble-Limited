@@ -76,6 +76,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 try:
     import uvloop
+
     uvloop.install()
     logger.info("uvloop installed and enabled.")
 except ImportError:
