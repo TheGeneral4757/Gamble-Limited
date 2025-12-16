@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 from app.core.database import db
 from app.config import settings, PROJECT_ROOT
 from app.core.odds import load_odds, save_odds, reload_odds
+from app.core.log_reader import get_log_lines
 from app.core.logger import get_logger
 from app.routers.auth import require_admin, admin_user
 import json
@@ -285,27 +286,5 @@ async def get_logs(
 ):
     """Get recent application logs."""
     log_file = PROJECT_ROOT / "data" / "app.log"
-    logs = []
-
-    try:
-        if log_file.exists():
-            with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
-                all_lines = f.readlines()
-
-                # Filter by level if specified
-                if level != "all":
-                    level_upper = level.upper()
-                    all_lines = [line for line in all_lines if level_upper in line]
-
-                # Get last N lines
-                logs = all_lines[-lines:]
-                logs = [line.strip() for line in logs]
-        else:
-            logs = [
-                "Log file not found. Enable file logging in config: logging.log_to_file = true"
-            ]
-
-    except Exception as e:
-        logs = [f"Error reading logs: {e}"]
-
+    logs = get_log_lines(log_file, lines, level)
     return {"success": True, "logs": logs, "count": len(logs)}
