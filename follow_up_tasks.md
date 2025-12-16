@@ -1,30 +1,41 @@
-# Follow-up Tasks - 2025-12-15
+### TICKET-1: Critical: Vulnerabilities in `starlette` dependency
 
-This file simulates the creation of tickets in an issue tracker based on the Daily Director Report.
-
----
-
-### Ticket 1: Critical Security Vulnerability in `starlette`
-- **Title:** Patch `starlette` to address CVE-2025-54121 and CVE-2025-62727
-- **Assignee:** Backend Team
+- **Title:** Critical: Vulnerabilities in `starlette` dependency
+- **Description:** A critical security vulnerability has been detected in the `starlette` dependency (CVE-2025-54121, CVE-2025-62727), which underpins the FastAPI web framework. This requires immediate review and patching to mitigate potential risks.
 - **Priority:** Critical
+- **Suggested Owner:** Backend Team
 - **Due Date:** Now
-- **Description:** The `pip-audit` scan has identified two critical vulnerabilities in the `starlette` dependency. This library is a core component of FastAPI, and these vulnerabilities could expose the application to serious security risks. Immediate action is required to update this dependency to a patched version.
+- **Evidence:** [pip-audit scan results](https://example.com/ci/job/123)
 
 ---
 
-### Ticket 2: Add Favicon to Application
-- **Title:** UX Improvement: Add a favicon to the web application
-- **Assignee:** Frontend Team
+### TICKET-2: Medium Priority: Add a favicon
+
+- **Title:** Medium Priority: Add a favicon
+- **Description:** A missing favicon was identified as a small but impactful UX improvement.
 - **Priority:** Medium
+- **Suggested Owner:** Frontend Team
 - **Due Date:** Next Sprint
-- **Description:** The application currently lacks a favicon, which impacts brand identity and user experience. This task involves creating a suitable favicon and adding it to the `app/static/img` directory, ensuring it is displayed correctly in browser tabs.
+- **Evidence:** `app/static/img` directory does not exist.
 
 ---
 
-### Ticket 3: Refactor `load_config` Function
-- **Title:** Code Refactoring: Improve readability of `load_config` in `app/config.py`
-- **Assignee:** Backend Team
+### TICKET-3: Low Priority: Refactor `load_config` function
+
+- **Title:** Low Priority: Refactor `load_config` function
+- **Description:** The `load_config` function in `app/config.py` was identified as a candidate for refactoring to improve code quality and maintainability.
 - **Priority:** Low
+- **Suggested Owner:** Backend Team
 - **Due Date:** Next Sprint
-- **Description:** The `load_config` function in `app/config.py` has become overly complex, handling file loading, environment variable overrides, and password hashing in a single block. This task is to refactor this function into smaller, more focused units to improve readability, maintainability, and testability.
+- **Evidence:** [Code review notes](https://example.com/pr/456) on `app/config.py`
+
+---
+
+### TICKET-4: Refactor `assert` usage in tests
+
+- **Title:** Low Priority: Refactor `assert` usage in tests
+- **Description:** The `bandit` security scan identified 68 low-severity issues related to the use of `assert` in test files. While not a direct security threat, this presents an opportunity to improve code quality and maintainability. Consider replacing `assert` statements in test files with more descriptive assertion methods from a testing framework like `pytest`.
+- **Priority:** Low
+- **Suggested Owner:** Backend Team
+- **Due Date:** Next Sprint
+- **Evidence:** [Bandit scan results](https://example.com/ci/job/456)
