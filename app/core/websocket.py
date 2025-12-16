@@ -82,27 +82,35 @@ class ConnectionManager:
             except Exception as e:
                 logger.warning(f"Failed to send to user {user_id}: {e}")
 
-    async def broadcast(self, message: dict, exclude: WebSocket = None):
-        """Broadcast a message to all connected clients concurrently."""
-
-        # Create a list of send tasks
-        tasks = []
-        for websocket in self.all_connections:
-            if websocket != exclude:
-                tasks.append(self._send_with_error_handling(websocket, message))
-
-        # Run all send tasks concurrently
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Process results to find and remove disconnected clients
+    async def broadcast(
+        self,
+        message: dict,
+        exclude: WebSocket = None,
+        batch_size: int = 100,
+        delay: float = 0.01,
+    ):
+        """
+        Broadcast a message to all connected clients in batches to avoid
+        event loop blockage.
+        """
         disconnected = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                # The websocket that failed is the one at the same index in our original set
-                # Note: This is a simplification. A more robust way would be to pass the websocket
-                # back with the result.
-                ws = list(self.all_connections - {exclude if exclude else None})[i]
-                disconnected.append(ws)
+        connections_to_send = [
+            ws for ws in self.all_connections if ws != exclude
+        ]
+
+        for i in range(0, len(connections_to_send), batch_size):
+            batch = connections_to_send[i : i + batch_size]
+            tasks = [self._send_with_error_handling(ws, message) for ws in batch]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for ws, result in zip(batch, results):
+                if isinstance(result, Exception):
+                    disconnected.append(ws)
+
+            # If not the last batch, sleep to yield control
+            is_last_batch = (i + batch_size) >= len(connections_to_send)
+            if delay > 0 and not is_last_batch:
+                await asyncio.sleep(delay)
 
         if disconnected:
             logger.info(

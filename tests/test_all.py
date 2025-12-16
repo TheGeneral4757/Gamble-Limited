@@ -338,8 +338,64 @@ def run_websocket_tests():
         # Just check that it's a list-like structure
         assert hasattr(history, "__len__"), "Chat history should be iterable"
 
+    @test("Batched broadcast sends to all")
+    def test_batched_broadcast():
+        import asyncio
+        from unittest.mock import patch, AsyncMock
+        from app.core.websocket import ws_manager
+
+        class MockWebSocket:
+            def __init__(self, should_fail=False):
+                self.send_count = 0
+                self.should_fail = should_fail
+
+            async def send_json(self, data):
+                if self.should_fail:
+                    raise ConnectionError("Failed to send")
+                self.send_count += 1
+
+        async def run_test():
+            # Reset connections for clean test
+            ws_manager.all_connections.clear()
+            ws_manager.active_connections.clear()
+
+            num_connections = 150
+            batch_size = 50
+
+            connections = [MockWebSocket() for _ in range(num_connections)]
+            for ws in connections:
+                ws_manager.all_connections.add(ws)
+
+            with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+                await ws_manager.broadcast({"type": "test"}, batch_size=batch_size, delay=0.001)
+
+                # Check all messages were sent
+                total_sends = sum(ws.send_count for ws in connections)
+                assert total_sends == num_connections, f"Expected {num_connections} sends, got {total_sends}"
+
+                # Check that sleep was called between batches
+                num_batches = (num_connections + batch_size - 1) // batch_size
+                expected_sleeps = num_batches - 1 if num_batches > 1 else 0
+                assert mock_sleep.call_count == expected_sleeps, f"Expected {expected_sleeps} sleeps, got {mock_sleep.call_count}"
+
+            # Test disconnected client cleanup
+            ws_manager.all_connections.clear()
+            failing_ws = MockWebSocket(should_fail=True)
+            working_ws = MockWebSocket()
+            ws_manager.all_connections.add(failing_ws)
+            ws_manager.all_connections.add(working_ws)
+
+            assert len(ws_manager.all_connections) == 2
+            await ws_manager.broadcast({"type": "cleanup_test"})
+            assert len(ws_manager.all_connections) == 1, "Failed to remove disconnected client"
+            assert failing_ws not in ws_manager.all_connections, "Failed client should be removed"
+            assert working_ws in ws_manager.all_connections, "Working client should not be removed"
+
+        asyncio.run(run_test())
+
     test_ws_manager()
     test_chat_history()
+    test_batched_broadcast()
 
 
 # ==================== Run All Tests ====================
