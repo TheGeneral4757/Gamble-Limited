@@ -96,11 +96,11 @@
     <!-- Chat Widget -->
     {% if user %}
     <div id="chat-widget" class="chat-widget minimized">
-        <div class="chat-header" onclick="toggleChat()">
+        <button class="chat-header" onclick="toggleChat()" aria-controls="chat-body-container" aria-expanded="false" style="border: none; width: 100%; text-align: left; background: none; color: inherit; font: inherit;">
             <span>💬 Live Chat</span>
             <span class="chat-badge" id="chat-badge">0</span>
-        </div>
-        <div class="chat-body">
+        </button>
+        <div id="chat-body-container" class="chat-body">
             <div class="chat-messages" id="chat-messages"></div>
             <div class="chat-input-container">
                 <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200"
@@ -235,8 +235,11 @@
 
             window.toggleChat = function () {
                 const widget = document.getElementById('chat-widget');
-                widget.classList.toggle('minimized');
-                if (!widget.classList.contains('minimized')) {
+                const isMinimized = widget.classList.toggle('minimized');
+                const button = widget.querySelector('.chat-header');
+                button.setAttribute('aria-expanded', !isMinimized);
+
+                if (!isMinimized) {
                     unreadCount = 0;
                     updateChatBadge();
                     document.getElementById('chat-input').focus();
