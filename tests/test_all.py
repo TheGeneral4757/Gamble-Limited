@@ -136,6 +136,47 @@ def run_database_tests():
         cash = db.claim_daily_cash(user_id)
         assert cash["success"], f"Claim failed: {cash.get('error')}"
 
+    @test("Daily bonus race condition")
+    def test_daily_bonus_race_condition():
+        import threading
+        from app.core.database import db
+
+        username = random_username()
+        result = db.create_user(username)
+        assert result["success"], f"Create failed: {result.get('error')}"
+        user_id = result["user_id"]
+
+        success_count = [0]
+        error_count = [0]
+        num_threads = 5
+
+        def claim():
+            try:
+                # Use a new connection for each thread to simulate web requests
+                thread_db = db
+                res = thread_db.claim_daily_bonus(user_id)
+                if res["success"]:
+                    success_count[0] += 1
+                elif "already claimed" in res.get("error", ""):
+                    error_count[0] += 1
+                elif "in progress" in res.get("error", ""):
+                    error_count[0] += 1
+            except Exception:
+                error_count[0] += 1
+
+        threads = [threading.Thread(target=claim) for _ in range(num_threads)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert (
+            success_count[0] == 1
+        ), f"Expected 1 successful claim, but got {success_count[0]}"
+        assert (
+            success_count[0] + error_count[0] == num_threads
+        ), "Some threads failed unexpectedly"
+
     @test("THE HOUSE user exists")
     def test_house_user():
         house = db.get_house_user()
@@ -156,6 +197,7 @@ def run_database_tests():
     test_unban()
     test_daily_bonus()
     test_daily_cash()
+    test_daily_bonus_race_condition()
     test_house_user()
     test_house_cut()
 
