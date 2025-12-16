@@ -61,15 +61,15 @@ A full-featured, self-hosted casino gaming platform built with Python and FastAP
     cd RNG-THING
     ```
 
-2.  **Install dependencies:**
+2.  **Run the development setup script:**
+    This script will create a virtual environment, install dependencies, and set up your `.env` file.
     ```bash
-    pip install -r requirements.txt
+    bash scripts/setup_dev.sh
     ```
 
-3.  **Configure your environment:**
-    Copy `.env.example` to `.env`. The default settings are suitable for local testing.
+3.  **Activate the virtual environment:**
     ```bash
-    cp .env.example .env
+    source venv/bin/activate
     ```
 
 4.  **Run the development server:**
