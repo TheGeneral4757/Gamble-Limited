@@ -1,13 +1,6 @@
-## Director's Journal
+# Director's Journal
 
-This journal is used to record durable, organizational learnings that change how coordination works.
-
----
-
-### 2025-12-15 - First Director Run
-
-**Observation:** The first run of the Director agent has been successfully completed. The process of collecting, validating, and synthesizing agent outputs has been established. The initial report identified a critical security vulnerability, confirming the value of automated daily reporting.
-
-**Action:** The daily report and follow-up tasks have been generated and will be delivered to the development team. The process will be monitored for feedback and refined in subsequent runs.
-
-**Outcome:** A baseline for daily reporting has been established. The development team is now equipped with a clear, actionable summary of the project's status, enabling them to prioritize their work effectively.
+2025-12-17 - Critical Vulnerabilities and Test Failures
+Observation: The daily run uncovered critical vulnerabilities in the `starlette` dependency and a failing test in the WebSocket broadcast functionality. The `requirements.txt` file was also found to be out of date, causing multiple test failures due to missing dependencies.
+Action: Created a daily report and follow-up tasks to address the vulnerabilities and the failing test. The `requirements.txt` file was updated with the missing dependencies.
+Outcome: The immediate next steps are for the backend team to upgrade the `starlette` dependency and fix the failing test. A review of the `assert` usage in tests is also recommended for the next sprint.
