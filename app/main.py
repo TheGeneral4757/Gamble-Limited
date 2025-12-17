@@ -153,16 +153,25 @@ async def websocket_endpoint(websocket: WebSocket):
     - Big win announcements
     - Global chat
     """
-    # Get user info from cookies
-    cookies = websocket.cookies
-    user_id = cookies.get("user_id")
-    username = cookies.get("username", "Guest")
+    # Securely get user info from signed cookies
+    from app.routers.auth import get_current_user
+
+    user = get_current_user(websocket)
     client_ip = websocket.client.host
 
-    try:
-        user_id = int(user_id) if user_id and user_id != "0" else None
-    except Exception:
-        user_id = None
+    if user:
+        user_id = user["user_id"]
+        username = user["username"]
+    else:
+        # Deny connection if user is not authenticated
+        ws_logger.warning(
+            "WebSocket connection denied due to invalid auth",
+            extra={"client_ip": client_ip},
+        )
+        await websocket.accept()
+        await websocket.send_json({"type": "error", "message": "Authentication failed"})
+        await websocket.close()
+        return
 
     await ws_manager.connect(websocket, user_id)
     ws_logger.info(

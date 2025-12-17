@@ -2,6 +2,8 @@ from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
+import hmac
+import hashlib
 from app.core.database import db
 from app.config import settings, PROJECT_ROOT
 from app.core.logger import get_logger
@@ -10,6 +12,14 @@ logger = get_logger("auth")
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "app" / "templates"))
+
+
+def create_signature(user_id: str, username: str, user_type: str) -> str:
+    """Create a secure signature for user cookie data."""
+    message = f"{user_id}|{username}|{user_type}"
+    return hmac.new(
+        settings.security.secret_key.encode(), message.encode(), hashlib.sha256
+    ).hexdigest()
 
 
 @router.get("/auth")
@@ -69,11 +79,16 @@ async def user_login(
     logger.info(f"User logged in: {username}")
 
     # Set session cookie
+    user_id = str(user["id"])
+    user_type = user.get("user_type", "user")
+    signature = create_signature(user_id, user["username"], user_type)
+
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie("user_id", str(user["id"]), max_age=31536000)
+    response.set_cookie("user_id", user_id, max_age=31536000)
     response.set_cookie("username", user["username"], max_age=31536000)
     response.set_cookie("is_admin", "0", max_age=31536000)
-    response.set_cookie("user_type", user.get("user_type", "user"), max_age=31536000)
+    response.set_cookie("user_type", user_type, max_age=31536000)
+    response.set_cookie("signature", signature, max_age=31536000)
 
     return response
 
@@ -168,11 +183,16 @@ async def user_register(
     logger.info(f"New user registered: {username}")
 
     # Login the new user
+    user_id = str(result["user_id"])
+    user_type = "user"
+    signature = create_signature(user_id, username, user_type)
+
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie("user_id", str(result["user_id"]), max_age=31536000)
+    response.set_cookie("user_id", user_id, max_age=31536000)
     response.set_cookie("username", username, max_age=31536000)
     response.set_cookie("is_admin", "0", max_age=31536000)
-    response.set_cookie("user_type", "user", max_age=31536000)
+    response.set_cookie("user_type", user_type, max_age=31536000)
+    response.set_cookie("signature", signature, max_age=31536000)
 
     return response
 
@@ -214,11 +234,18 @@ async def admin_login(request: Request, password: str = Form(...)):
     """Admin login with password."""
     if db.verify_admin_password(password):
         logger.info("Admin logged in")
+
+        user_id = "0"
+        username = "Administrator"
+        user_type = "admin"
+        signature = create_signature(user_id, username, user_type)
+
         response = RedirectResponse(url="/admin", status_code=303)
-        response.set_cookie("user_id", "0", max_age=31536000)
-        response.set_cookie("username", "Administrator", max_age=31536000)
+        response.set_cookie("user_id", user_id, max_age=31536000)
+        response.set_cookie("username", username, max_age=31536000)
         response.set_cookie("is_admin", "1", max_age=31536000)
-        response.set_cookie("user_type", "admin", max_age=31536000)
+        response.set_cookie("user_type", user_type, max_age=31536000)
+        response.set_cookie("signature", signature, max_age=31536000)
         response.set_cookie("admin_session", "authenticated", max_age=3600)  # 1 hour
         return response
 
@@ -245,13 +272,18 @@ async def house_login(request: Request, password: str = Form(...)):
             house_user = db.get_house_user()
 
         logger.info("THE HOUSE logged in")
+
+        user_id = str(house_user["id"]) if house_user else "0"
+        username = "THE HOUSE"
+        user_type = "house"
+        signature = create_signature(user_id, username, user_type)
+
         response = RedirectResponse(url="/admin", status_code=303)
-        response.set_cookie(
-            "user_id", str(house_user["id"]) if house_user else "0", max_age=31536000
-        )
-        response.set_cookie("username", "THE HOUSE", max_age=31536000)
+        response.set_cookie("user_id", user_id, max_age=31536000)
+        response.set_cookie("username", username, max_age=31536000)
         response.set_cookie("is_admin", "1", max_age=31536000)
-        response.set_cookie("user_type", "house", max_age=31536000)
+        response.set_cookie("user_type", user_type, max_age=31536000)
+        response.set_cookie("signature", signature, max_age=31536000)
         response.set_cookie("admin_session", "authenticated", max_age=3600)
         return response
 
@@ -276,17 +308,30 @@ async def logout(request: Request):
     response.delete_cookie("is_admin")
     response.delete_cookie("admin_session")
     response.delete_cookie("user_type")
+    response.delete_cookie("signature")
     return response
 
 
 def get_current_user(request: Request) -> dict:
-    """Get current user from cookies."""
+    """
+    Get current user from cookies, validating the signature.
+    Returns user dict if valid, None otherwise.
+    """
     user_id = request.cookies.get("user_id")
     username = request.cookies.get("username")
-    is_admin = request.cookies.get("is_admin") == "1"
-    user_type = request.cookies.get("user_type", "user")
+    user_type = request.cookies.get("user_type")
+    signature = request.cookies.get("signature")
 
-    if not user_id:
+    if not all([user_id, username, user_type, signature]):
+        return None
+
+    # Validate signature
+    expected_signature = create_signature(user_id, username, user_type)
+    if not hmac.compare_digest(expected_signature, signature):
+        logger.warning(
+            "Invalid signature attempt",
+            extra={"user_id": user_id, "username": username},
+        )
         return None
 
     # Handle invalid/old format user IDs
@@ -297,8 +342,8 @@ def get_current_user(request: Request) -> dict:
 
     return {
         "user_id": parsed_user_id,
-        "username": username or "Guest",
-        "is_admin": is_admin,
+        "username": username,
+        "is_admin": user_type in ["admin", "house"],
         "user_type": user_type,
         "is_house": user_type == "house",
     }
