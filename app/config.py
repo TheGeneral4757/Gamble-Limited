@@ -213,6 +213,8 @@ def load_config() -> AppConfig:
         data["logging"] = {}
     if "paths" not in data:
         data["paths"] = {}
+    if "support" not in data:
+        data["support"] = {}
     
     # Add new economy fields if not present
     if "daily_bonus_amount" not in data.get("economy", {}):
