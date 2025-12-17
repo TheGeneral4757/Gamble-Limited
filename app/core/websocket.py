@@ -71,8 +71,6 @@ class ConnectionManager:
         if user_id and user_id in self.active_connections:
             del self.active_connections[user_id]
 
-        logger.info(f"WebSocket disconnected: total={len(self.all_connections)}")
-
     async def send_personal(self, user_id: int, message: dict):
         """Send a message to a specific user."""
         websocket = self.active_connections.get(user_id)
