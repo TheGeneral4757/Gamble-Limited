@@ -263,9 +263,6 @@ def load_config() -> AppConfig:
     if get_env("RATE_LIMIT_API_REQUESTS"):
         data.setdefault("rate_limit", {})["api_requests"] = get_env("RATE_LIMIT_API_REQUESTS")
 
-    if get_env("SUPPORT_EMAIL"):
-        data.setdefault("support", {})["email"] = get_env("SUPPORT_EMAIL")
-    
     # Auto-hash password if it's not already hashed
     if "security" in data:
         current_pwd = data["security"].get("admin_password_hash", "")
