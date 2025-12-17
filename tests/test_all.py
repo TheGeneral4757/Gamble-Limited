@@ -22,35 +22,64 @@ def random_username():
     return "test" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
 
+import asyncio
+
 def test(name):
     """Decorator to mark test functions."""
 
     def decorator(func):
-        def wrapper():
-            try:
-                func()
-                results["passed"] += 1
-                results["tests"].append({"name": name, "status": "PASS"})
-                print(f"  ✓ {name}")
-                return True
-            except AssertionError as e:
-                results["failed"] += 1
-                results["tests"].append(
-                    {"name": name, "status": "FAIL", "error": str(e)}
-                )
-                print(f"  ✗ {name}: {e}")
-                return False
-            except Exception as e:
-                results["failed"] += 1
-                results["tests"].append(
-                    {"name": name, "status": "ERROR", "error": str(e)}
-                )
-                print(f"  ✗ {name}: {type(e).__name__}: {e}")
-                traceback.print_exc()
-                return False
-
-        wrapper.__name__ = func.__name__
-        return wrapper
+        if asyncio.iscoroutinefunction(func):
+            # Async test function
+            async def async_wrapper():
+                try:
+                    await func()
+                    results["passed"] += 1
+                    results["tests"].append({"name": name, "status": "PASS"})
+                    print(f"  ✓ {name}")
+                    return True
+                except AssertionError as e:
+                    results["failed"] += 1
+                    results["tests"].append(
+                        {"name": name, "status": "FAIL", "error": str(e)}
+                    )
+                    print(f"  ✗ {name}: {e}")
+                    return False
+                except Exception as e:
+                    results["failed"] += 1
+                    results["tests"].append(
+                        {"name": name, "status": "ERROR", "error": str(e)}
+                    )
+                    print(f"  ✗ {name}: {type(e).__name__}: {e}")
+                    traceback.print_exc()
+                    return False
+            async_wrapper.__name__ = func.__name__
+            return async_wrapper
+        else:
+            # Sync test function
+            def sync_wrapper():
+                try:
+                    func()
+                    results["passed"] += 1
+                    results["tests"].append({"name": name, "status": "PASS"})
+                    print(f"  ✓ {name}")
+                    return True
+                except AssertionError as e:
+                    results["failed"] += 1
+                    results["tests"].append(
+                        {"name": name, "status": "FAIL", "error": str(e)}
+                    )
+                    print(f"  ✗ {name}: {e}")
+                    return False
+                except Exception as e:
+                    results["failed"] += 1
+                    results["tests"].append(
+                        {"name": name, "status": "ERROR", "error": str(e)}
+                    )
+                    print(f"  ✗ {name}: {type(e).__name__}: {e}")
+                    traceback.print_exc()
+                    return False
+            sync_wrapper.__name__ = func.__name__
+            return sync_wrapper
 
     return decorator
 
@@ -398,6 +427,30 @@ def run_websocket_tests():
     test_batched_broadcast()
 
 
+import uvicorn
+import threading
+import time
+from app.main import app
+
+TEST_PORT = 8123
+TEST_HOST = "127.0.0.1"
+
+
+class TestServer(threading.Thread):
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.server = None
+
+    def run(self):
+        config = uvicorn.Config(app, host=TEST_HOST, port=TEST_PORT, log_level="info")
+        self.server = uvicorn.Server(config)
+        self.server.run()
+
+    def shutdown(self):
+        if self.server:
+            self.server.should_exit = True
+
+
 # ==================== Run All Tests ====================
 
 
@@ -407,14 +460,38 @@ def run_all_tests():
     print("=" * 50)
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
+    server = TestServer()
+    server.start()
+    time.sleep(1)
+
     try:
+        from tests.test_auth import (
+            test_login_sets_signature,
+            test_websocket_valid_signature,
+            test_websocket_invalid_signature,
+            test_websocket_missing_signature,
+            test_websocket_tampered_cookie,
+        )
+
         run_config_tests()
         run_database_tests()
         run_game_tests()
         run_websocket_tests()
+
+        print("\n🔐 Authentication & Authorization Tests")
+        print("-" * 40)
+        asyncio.run(test_login_sets_signature())
+        asyncio.run(test_websocket_valid_signature())
+        asyncio.run(test_websocket_invalid_signature())
+        asyncio.run(test_websocket_missing_signature())
+        asyncio.run(test_websocket_tampered_cookie())
+
     except Exception as e:
         print(f"\n❌ Test suite crashed: {e}")
         traceback.print_exc()
+    finally:
+        server.shutdown()
+        server.join()
 
     # Summary
     print("\n" + "=" * 50)
