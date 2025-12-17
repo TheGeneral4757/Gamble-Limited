@@ -57,7 +57,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Referrer policy
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
-        # Content Security Policy - allow WebSocket connections
+        # Content Security Policy
         csp = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline'; "
@@ -144,6 +144,35 @@ logger.info(f"Admin login path: {settings.security.admin_login_path}")
 # ==================== WebSocket Endpoint ====================
 
 
+async def _handle_websocket_message(websocket: WebSocket, data: str, username: str):
+    """Handles incoming websocket messages."""
+    try:
+        message = json.loads(data)
+        msg_type = message.get("type")
+
+        if msg_type == "chat" and username:
+            content = message.get("message", "").strip()
+            if content and len(content) <= 200:
+                await ws_manager.add_chat_message(username, content)
+
+        elif msg_type == "ping":
+            await websocket.send_json({"type": "pong"})
+
+    except json.JSONDecodeError:
+        ws_logger.debug("Invalid JSON received from websocket.")
+
+
+def _get_user_id_from_websocket(websocket: WebSocket) -> int | None:
+    """Extracts user ID from websocket cookies."""
+    user_id_cookie = websocket.cookies.get("user_id")
+    if not user_id_cookie or user_id_cookie == "0":
+        return None
+    try:
+        return int(user_id_cookie)
+    except (ValueError, TypeError):
+        return None
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """
@@ -153,16 +182,9 @@ async def websocket_endpoint(websocket: WebSocket):
     - Big win announcements
     - Global chat
     """
-    # Get user info from cookies
-    cookies = websocket.cookies
-    user_id = cookies.get("user_id")
-    username = cookies.get("username", "Guest")
+    user_id = _get_user_id_from_websocket(websocket)
+    username = websocket.cookies.get("username", "Guest")
     client_ip = websocket.client.host
-
-    try:
-        user_id = int(user_id) if user_id and user_id != "0" else None
-    except Exception:
-        user_id = None
 
     await ws_manager.connect(websocket, user_id)
     ws_logger.info(
@@ -171,44 +193,26 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            # Receive message
             data = await websocket.receive_text()
-
-            try:
-                message = json.loads(data)
-                msg_type = message.get("type")
-
-                if msg_type == "chat" and username:
-                    # Handle chat message
-                    content = message.get("message", "").strip()
-                    if content and len(content) <= 200:
-                        await ws_manager.add_chat_message(username, content)
-
-                elif msg_type == "ping":
-                    # Keep-alive ping
-                    await websocket.send_json({"type": "pong"})
-
-            except json.JSONDecodeError:
-                pass
-
+            await _handle_websocket_message(websocket, data, username)
     except WebSocketDisconnect as e:
-        ws_manager.disconnect(websocket, user_id)
         ws_logger.info(
-            "WebSocket disconnected",
+            "WebSocket disconnected cleanly",
             extra={
                 "user_id": user_id,
                 "client_ip": client_ip,
-                "ws_disconnect_code": e.code,
-                "ws_disconnect_reason": e.reason,
+                "code": e.code,
+                "reason": e.reason,
             },
         )
     except Exception as e:
-        logger.warning(f"WebSocket error: {e}")
-        ws_manager.disconnect(websocket, user_id)
+        logger.warning(f"Unexpected WebSocket error: {e}", exc_info=True)
         ws_logger.error(
-            "WebSocket error",
+            "WebSocket connection closed due to error",
             extra={"user_id": user_id, "client_ip": client_ip, "error": str(e)},
         )
+    finally:
+        ws_manager.disconnect(websocket, user_id)
 
 
 # ==================== Global Exception Handler ====================
