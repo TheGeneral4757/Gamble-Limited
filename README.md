@@ -72,7 +72,13 @@ A full-featured, self-hosted casino gaming platform built with Python and FastAP
     source venv/bin/activate
     ```
 
-4.  **Run the development server:**
+4.  **Create a test user (optional):**
+    This script creates a user with the username `testuser` and password `password`.
+    ```bash
+    python scripts/create_test_user.py
+    ```
+
+5.  **Run the development server:**
     ```bash
     python -m app.main
     ```
