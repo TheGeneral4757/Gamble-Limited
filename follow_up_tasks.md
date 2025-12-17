@@ -1,41 +1,27 @@
-### TICKET-1: Critical: Vulnerabilities in `starlette` dependency
+# Follow-up Tasks for 2025-12-17
 
-- **Title:** Critical: Vulnerabilities in `starlette` dependency
-- **Description:** A critical security vulnerability has been detected in the `starlette` dependency (CVE-2025-54121, CVE-2025-62727), which underpins the FastAPI web framework. This requires immediate review and patching to mitigate potential risks.
-- **Priority:** Critical
-- **Suggested Owner:** Backend Team
-- **Due Date:** Now
-- **Evidence:** [pip-audit scan results](https://example.com/ci/job/123)
+This document outlines the follow-up tasks based on the findings from the Daily Director Report of 2025-12-17.
 
----
+## Critical Tasks (Urgency: Now)
 
-### TICKET-2: Medium Priority: Add a favicon
+### 1. Upgrade `starlette` Dependency (TICKET-5)
+- **Description:** The `pip-audit` scan has identified two critical vulnerabilities in the `starlette` dependency (CVE-2025-54121 and CVE-2025-62727). This poses a significant security risk and must be addressed immediately.
+- **Action:** Upgrade the `starlette` package to a patched version. After upgrading, run the full test suite to ensure there are no compatibility issues.
+- **Owner:** Backend Team
+- **Evidence:** [Pip-Audit scan results](https://example.com/ci/job/457)
 
-- **Title:** Medium Priority: Add a favicon
-- **Description:** A missing favicon was identified as a small but impactful UX improvement.
-- **Priority:** Medium
-- **Suggested Owner:** Frontend Team
-- **Due Date:** Next Sprint
-- **Evidence:** `app/static/img` directory does not exist.
+## High Priority Tasks (Urgency: 24h)
 
----
+### 2. Fix Failing WebSocket Broadcast Test (TICKET-6)
+- **Description:** The test suite is failing on the "Batched broadcast sends to all" test, which indicates a potential regression in the WebSocket broadcast functionality. This could impact real-time features of the application.
+- **Action:** Investigate the `TypeError: ConnectionManager.broadcast() missing 1 required positional argument: 'message'` and implement a fix.
+- **Owner:** Backend Team
+- **Evidence:** [Test suite results](https://example.com/ci/job/457)
 
-### TICKET-3: Low Priority: Refactor `load_config` function
+## Low Priority Tasks (Urgency: Next Sprint)
 
-- **Title:** Low Priority: Refactor `load_config` function
-- **Description:** The `load_config` function in `app/config.py` was identified as a candidate for refactoring to improve code quality and maintainability.
-- **Priority:** Low
-- **Suggested Owner:** Backend Team
-- **Due Date:** Next Sprint
-- **Evidence:** [Code review notes](https://example.com/pr/456) on `app/config.py`
-
----
-
-### TICKET-4: Refactor `assert` usage in tests
-
-- **Title:** Low Priority: Refactor `assert` usage in tests
-- **Description:** The `bandit` security scan identified 68 low-severity issues related to the use of `assert` in test files. While not a direct security threat, this presents an opportunity to improve code quality and maintainability. Consider replacing `assert` statements in test files with more descriptive assertion methods from a testing framework like `pytest`.
-- **Priority:** Low
-- **Suggested Owner:** Backend Team
-- **Due Date:** Next Sprint
-- **Evidence:** [Bandit scan results](https://example.com/ci/job/456)
+### 3. Refactor `assert` Usage in Tests (TICKET-7)
+- **Description:** The `bandit` scan has identified 77 low-severity issues related to the use of `assert` in the test suite. While not a direct security risk, refactoring these assertions will improve code quality and maintainability.
+- **Action:** Replace `assert` statements with more descriptive assertion methods from a testing framework like `pytest`.
+- **Owner:** Backend Team
+- **Evidence:** [Bandit scan results](https://example.com/ci/job/457)
