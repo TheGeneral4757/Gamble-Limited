@@ -367,16 +367,22 @@ def run_websocket_tests():
                 ws_manager.all_connections.add(ws)
 
             with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-                await ws_manager.broadcast({"type": "test"}, batch_size=batch_size, delay=0.001)
+                await ws_manager.broadcast(
+                    {"type": "test"}, batch_size=batch_size, delay=0.001
+                )
 
                 # Check all messages were sent
                 total_sends = sum(ws.send_count for ws in connections)
-                assert total_sends == num_connections, f"Expected {num_connections} sends, got {total_sends}"
+                assert (
+                    total_sends == num_connections
+                ), f"Expected {num_connections} sends, got {total_sends}"
 
                 # Check that sleep was called between batches
                 num_batches = (num_connections + batch_size - 1) // batch_size
                 expected_sleeps = num_batches - 1 if num_batches > 1 else 0
-                assert mock_sleep.call_count == expected_sleeps, f"Expected {expected_sleeps} sleeps, got {mock_sleep.call_count}"
+                assert (
+                    mock_sleep.call_count == expected_sleeps
+                ), f"Expected {expected_sleeps} sleeps, got {mock_sleep.call_count}"
 
             # Test disconnected client cleanup
             ws_manager.all_connections.clear()
@@ -387,9 +393,15 @@ def run_websocket_tests():
 
             assert len(ws_manager.all_connections) == 2
             await ws_manager.broadcast({"type": "cleanup_test"})
-            assert len(ws_manager.all_connections) == 1, "Failed to remove disconnected client"
-            assert failing_ws not in ws_manager.all_connections, "Failed client should be removed"
-            assert working_ws in ws_manager.all_connections, "Working client should not be removed"
+            assert (
+                len(ws_manager.all_connections) == 1
+            ), "Failed to remove disconnected client"
+            assert (
+                failing_ws not in ws_manager.all_connections
+            ), "Failed client should be removed"
+            assert (
+                working_ws in ws_manager.all_connections
+            ), "Working client should not be removed"
 
         asyncio.run(run_test())
 

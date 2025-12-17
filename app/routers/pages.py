@@ -172,11 +172,14 @@ async def support_page(request: Request):
     """Support page accessible to all users."""
     user = get_current_user(request)
     ctx = get_base_context(request, user)
-    
+
     # Pass support config
-    ctx.update({
-        "support_email": settings.support.email,
-        "games_list": [g for g in VALID_GAMES if g != "lottery"] + ["lottery"] # Ensure lottery is included
-    })
-    
+    ctx.update(
+        {
+            "support_email": settings.support.email,
+            "games_list": [g for g in VALID_GAMES if g != "lottery"]
+            + ["lottery"],  # Ensure lottery is included
+        }
+    )
+
     return templates.TemplateResponse("support.html", ctx)

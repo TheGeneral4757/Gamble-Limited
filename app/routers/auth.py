@@ -1,12 +1,18 @@
+import json
 from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
+from itsdangerous import TimestampSigner, SignatureExpired, BadTimeSignature
+from datetime import timedelta
 from app.core.database import db
 from app.config import settings, PROJECT_ROOT
 from app.core.logger import get_logger
 
 logger = get_logger("auth")
+
+# Create a signer for secure cookies
+signer = TimestampSigner(settings.security.secret_key)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "app" / "templates"))
@@ -68,13 +74,25 @@ async def user_login(
 
     logger.info(f"User logged in: {username}")
 
-    # Set session cookie
-    response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie("user_id", str(user["id"]), max_age=31536000)
-    response.set_cookie("username", user["username"], max_age=31536000)
-    response.set_cookie("is_admin", "0", max_age=31536000)
-    response.set_cookie("user_type", user.get("user_type", "user"), max_age=31536000)
+    # Create session data
+    session_data = {
+        "user_id": user["id"],
+        "username": user["username"],
+        "is_admin": False,
+        "user_type": user.get("user_type", "user"),
+    }
 
+    # Create a secure, signed cookie
+    response = RedirectResponse(url="/", status_code=303)
+    session_cookie = signer.sign(json.dumps(session_data).encode("utf-8"))
+    response.set_cookie(
+        "session",
+        session_cookie.decode("utf-8"),
+        max_age=int(timedelta(days=30).total_seconds()),
+        httponly=True,
+        samesite="Lax",
+        secure=not settings.server.debug,  # Use Secure cookies in production
+    )
     return response
 
 
@@ -167,12 +185,25 @@ async def user_register(
 
     logger.info(f"New user registered: {username}")
 
+    # Create session data
+    session_data = {
+        "user_id": result["user_id"],
+        "username": username,
+        "is_admin": False,
+        "user_type": "user",
+    }
+
     # Login the new user
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie("user_id", str(result["user_id"]), max_age=31536000)
-    response.set_cookie("username", username, max_age=31536000)
-    response.set_cookie("is_admin", "0", max_age=31536000)
-    response.set_cookie("user_type", "user", max_age=31536000)
+    session_cookie = signer.sign(json.dumps(session_data).encode("utf-8"))
+    response.set_cookie(
+        "session",
+        session_cookie.decode("utf-8"),
+        max_age=int(timedelta(days=30).total_seconds()),
+        httponly=True,
+        samesite="Lax",
+        secure=not settings.server.debug,
+    )
 
     return response
 
@@ -214,12 +245,27 @@ async def admin_login(request: Request, password: str = Form(...)):
     """Admin login with password."""
     if db.verify_admin_password(password):
         logger.info("Admin logged in")
+
+        # Create session data for admin
+        session_data = {
+            "user_id": 0,
+            "username": "Administrator",
+            "is_admin": True,
+            "user_type": "admin",
+        }
+
         response = RedirectResponse(url="/admin", status_code=303)
-        response.set_cookie("user_id", "0", max_age=31536000)
-        response.set_cookie("username", "Administrator", max_age=31536000)
-        response.set_cookie("is_admin", "1", max_age=31536000)
-        response.set_cookie("user_type", "admin", max_age=31536000)
-        response.set_cookie("admin_session", "authenticated", max_age=3600)  # 1 hour
+        session_cookie = signer.sign(json.dumps(session_data).encode("utf-8"))
+        response.set_cookie(
+            "session",
+            session_cookie.decode("utf-8"),
+            max_age=int(
+                timedelta(hours=1).total_seconds()
+            ),  # Shorter session for admin
+            httponly=True,
+            samesite="Strict",  # More restrictive for admin
+            secure=not settings.server.debug,
+        )
         return response
 
     logger.warning("Failed admin login attempt")
@@ -245,14 +291,24 @@ async def house_login(request: Request, password: str = Form(...)):
             house_user = db.get_house_user()
 
         logger.info("THE HOUSE logged in")
+
+        session_data = {
+            "user_id": house_user["id"] if house_user else 0,
+            "username": "THE HOUSE",
+            "is_admin": True,
+            "user_type": "house",
+        }
+
         response = RedirectResponse(url="/admin", status_code=303)
+        session_cookie = signer.sign(json.dumps(session_data).encode("utf-8"))
         response.set_cookie(
-            "user_id", str(house_user["id"]) if house_user else "0", max_age=31536000
+            "session",
+            session_cookie.decode("utf-8"),
+            max_age=int(timedelta(hours=1).total_seconds()),
+            httponly=True,
+            samesite="Strict",
+            secure=not settings.server.debug,
         )
-        response.set_cookie("username", "THE HOUSE", max_age=31536000)
-        response.set_cookie("is_admin", "1", max_age=31536000)
-        response.set_cookie("user_type", "house", max_age=31536000)
-        response.set_cookie("admin_session", "authenticated", max_age=3600)
         return response
 
     logger.warning("Failed HOUSE login attempt")
@@ -271,37 +327,29 @@ async def house_login(request: Request, password: str = Form(...)):
 async def logout(request: Request):
     """Logout user."""
     response = RedirectResponse(url="/auth", status_code=303)
-    response.delete_cookie("user_id")
-    response.delete_cookie("username")
-    response.delete_cookie("is_admin")
-    response.delete_cookie("admin_session")
-    response.delete_cookie("user_type")
+    response.delete_cookie("session")
     return response
 
 
 def get_current_user(request: Request) -> dict:
-    """Get current user from cookies."""
-    user_id = request.cookies.get("user_id")
-    username = request.cookies.get("username")
-    is_admin = request.cookies.get("is_admin") == "1"
-    user_type = request.cookies.get("user_type", "user")
-
-    if not user_id:
+    """Get current user from a secure, signed cookie."""
+    session_cookie = request.cookies.get("session")
+    if not session_cookie:
         return None
 
-    # Handle invalid/old format user IDs
     try:
-        parsed_user_id = int(user_id) if user_id != "0" else 0
-    except (ValueError, TypeError):
-        return None
+        # Verify the cookie signature and timestamp (max_age = 30 days)
+        data = signer.unsign(session_cookie.encode("utf-8"), max_age=timedelta(days=30))
+        session_data = json.loads(data.decode("utf-8"))
 
-    return {
-        "user_id": parsed_user_id,
-        "username": username or "Guest",
-        "is_admin": is_admin,
-        "user_type": user_type,
-        "is_house": user_type == "house",
-    }
+        # Add 'is_house' for convenience
+        session_data["is_house"] = session_data.get("user_type") == "house"
+
+        return session_data
+
+    except (SignatureExpired, BadTimeSignature, json.JSONDecodeError):
+        # Invalid or expired cookie
+        return None
 
 
 def require_login(request: Request):
@@ -315,9 +363,8 @@ def require_login(request: Request):
 def require_admin(request: Request):
     """Check if user is admin or house."""
     user = get_current_user(request)
-    admin_session = request.cookies.get("admin_session")
 
-    if not user or not user["is_admin"] or admin_session != "authenticated":
+    if not user or not user["is_admin"]:
         return None
     return user
 
