@@ -7,7 +7,8 @@ import asyncio
 from typing import Dict, Set, List
 from datetime import datetime
 from fastapi import WebSocket
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
+import orjson  # Bolt: Use high-performance JSON library
 
 from app.core.logger import get_logger
 
@@ -43,6 +44,14 @@ class ConnectionManager:
         self.max_chat_history = 100
         self.message_counter = 0
 
+    async def _send_json(self, websocket: WebSocket, data: dict):
+        """
+        Bolt: Helper to send JSON using orjson for high performance.
+        orjson.dumps returns bytes, so we use send_bytes. This is faster
+        than encoding to a string and using send_text.
+        """
+        await websocket.send_bytes(orjson.dumps(data))
+
     async def connect(self, websocket: WebSocket, user_id: int = None):
         """Accept a new WebSocket connection."""
         await websocket.accept()
@@ -57,11 +66,14 @@ class ConnectionManager:
 
         # Send chat history to new connection
         if self.chat_history:
-            await websocket.send_json(
+            # Bolt: Skip slow asdict conversion; orjson handles dataclasses directly.
+            # This reduces overhead on each new connection.
+            await self._send_json(
+                websocket,
                 {
                     "type": "chat_history",
-                    "messages": [asdict(m) for m in self.chat_history[-50:]],
-                }
+                    "messages": self.chat_history[-50:],
+                },
             )
 
     def disconnect(self, websocket: WebSocket, user_id: int = None):
@@ -76,7 +88,7 @@ class ConnectionManager:
         websocket = self.active_connections.get(user_id)
         if websocket:
             try:
-                await websocket.send_json(message)
+                await self._send_json(websocket, message)
             except Exception as e:
                 logger.warning(f"Failed to send to user {user_id}: {e}")
 
@@ -120,7 +132,8 @@ class ConnectionManager:
     async def _send_with_error_handling(self, websocket: WebSocket, message: dict):
         """Wrapper to send a message and catch exceptions for disconnected clients."""
         try:
-            await websocket.send_json(message)
+            # Bolt: Use the optimized orjson helper.
+            await self._send_json(websocket, message)
         except Exception as e:
             # This will be caught by asyncio.gather
             raise e
@@ -168,7 +181,8 @@ class ConnectionManager:
             self.chat_history = self.chat_history[-self.max_chat_history :]
 
         # Broadcast to all
-        await self.broadcast({"type": "chat_message", "message": asdict(chat_msg)})
+        # Bolt: Skip slow asdict conversion; orjson handles dataclasses directly.
+        await self.broadcast({"type": "chat_message", "message": chat_msg})
 
         logger.debug(f"Chat: {username}: {message[:50]}...")
         return chat_msg
