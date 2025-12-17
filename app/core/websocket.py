@@ -38,6 +38,11 @@ class ConnectionManager:
         self.active_connections: Dict[int, WebSocket] = {}
         # All connections for broadcasts
         self.all_connections: Set[WebSocket] = set()
+        # Pub/sub topics
+        self.topics: Dict[str, Set[WebSocket]] = {
+            "chat": set(),
+            "big_wins": set(),
+        }
         # Chat message history (last 100 messages)
         self.chat_history: List[ChatMessage] = []
         self.max_chat_history = 100
@@ -50,6 +55,10 @@ class ConnectionManager:
 
         if user_id:
             self.active_connections[user_id] = websocket
+
+        # By default, subscribe to all topics
+        for topic in self.topics.keys():
+            self.topics[topic].add(websocket)
 
         logger.info(
             f"WebSocket connected: user_id={user_id}, total={len(self.all_connections)}"
@@ -71,7 +80,24 @@ class ConnectionManager:
         if user_id and user_id in self.active_connections:
             del self.active_connections[user_id]
 
+        for topic in self.topics.values():
+            topic.discard(websocket)
+
         logger.info(f"WebSocket disconnected: total={len(self.all_connections)}")
+
+    async def subscribe(self, websocket: WebSocket, topic: str):
+        """Subscribe a websocket to a topic."""
+        if topic in self.topics:
+            self.topics[topic].add(websocket)
+            await websocket.send_json({"type": "status", "message": f"Subscribed to {topic}"})
+        else:
+            await websocket.send_json({"type": "error", "message": "Topic not found"})
+
+    async def unsubscribe(self, websocket: WebSocket, topic: str):
+        """Unsubscribe a websocket from a topic."""
+        if topic in self.topics:
+            self.topics[topic].discard(websocket)
+            await websocket.send_json({"type": "status", "message": f"Unsubscribed from {topic}"})
 
     async def send_personal(self, user_id: int, message: dict):
         """Send a message to a specific user."""
@@ -84,18 +110,23 @@ class ConnectionManager:
 
     async def broadcast(
         self,
+        topic: str,
         message: dict,
         exclude: WebSocket = None,
         batch_size: int = 100,
         delay: float = 0.01,
     ):
         """
-        Broadcast a message to all connected clients in batches to avoid
-        event loop blockage.
+        Broadcast a message to all connected clients in a topic in batches
+        to avoid event loop blockage.
         """
+        if topic not in self.topics:
+            logger.warning(f"Broadcast to unknown topic: {topic}")
+            return
+
         disconnected = []
         connections_to_send = [
-            ws for ws in self.all_connections if ws != exclude
+            ws for ws in self.topics[topic] if ws != exclude
         ]
 
         for i in range(0, len(connections_to_send), batch_size):
@@ -138,6 +169,7 @@ class ConnectionManager:
     ):
         """Announce a big win to all connected clients."""
         await self.broadcast(
+            "big_wins",
             {
                 "type": "big_win",
                 "username": username,
@@ -145,7 +177,7 @@ class ConnectionManager:
                 "amount": amount,
                 "multiplier": multiplier,
                 "timestamp": datetime.now().isoformat(),
-            }
+            },
         )
         logger.info(f"Big win broadcast: {username} won {amount} on {game}")
 
@@ -170,7 +202,9 @@ class ConnectionManager:
             self.chat_history = self.chat_history[-self.max_chat_history :]
 
         # Broadcast to all
-        await self.broadcast({"type": "chat_message", "message": asdict(chat_msg)})
+        await self.broadcast(
+            "chat", {"type": "chat_message", "message": asdict(chat_msg)}
+        )
 
         logger.debug(f"Chat: {username}: {message[:50]}...")
         return chat_msg

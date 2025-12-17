@@ -188,6 +188,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Keep-alive ping
                     await websocket.send_json({"type": "pong"})
 
+                elif msg_type == "subscribe":
+                    topic = message.get("topic")
+                    if topic:
+                        await ws_manager.subscribe(websocket, topic)
+
+                elif msg_type == "unsubscribe":
+                    topic = message.get("topic")
+                    if topic:
+                        await ws_manager.unsubscribe(websocket, topic)
+
             except json.JSONDecodeError:
                 pass
 

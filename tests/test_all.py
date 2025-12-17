@@ -358,6 +358,8 @@ def run_websocket_tests():
             # Reset connections for clean test
             ws_manager.all_connections.clear()
             ws_manager.active_connections.clear()
+            for topic in ws_manager.topics.values():
+                topic.clear()
 
             num_connections = 150
             batch_size = 50
@@ -365,9 +367,12 @@ def run_websocket_tests():
             connections = [MockWebSocket() for _ in range(num_connections)]
             for ws in connections:
                 ws_manager.all_connections.add(ws)
+                ws_manager.topics["chat"].add(ws)
 
             with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-                await ws_manager.broadcast({"type": "test"}, batch_size=batch_size, delay=0.001)
+                # For this test, we'll broadcast to the 'chat' topic,
+                # assuming the mock connections would be subscribed.
+                await ws_manager.broadcast("chat", {"type": "test"}, batch_size=batch_size, delay=0.001)
 
                 # Check all messages were sent
                 total_sends = sum(ws.send_count for ws in connections)
@@ -380,13 +385,17 @@ def run_websocket_tests():
 
             # Test disconnected client cleanup
             ws_manager.all_connections.clear()
+            for topic in ws_manager.topics.values():
+                topic.clear()
             failing_ws = MockWebSocket(should_fail=True)
             working_ws = MockWebSocket()
             ws_manager.all_connections.add(failing_ws)
+            ws_manager.topics["chat"].add(failing_ws)
             ws_manager.all_connections.add(working_ws)
+            ws_manager.topics["chat"].add(working_ws)
 
             assert len(ws_manager.all_connections) == 2
-            await ws_manager.broadcast({"type": "cleanup_test"})
+            await ws_manager.broadcast("chat", {"type": "cleanup_test"})
             assert len(ws_manager.all_connections) == 1, "Failed to remove disconnected client"
             assert failing_ws not in ws_manager.all_connections, "Failed client should be removed"
             assert working_ws in ws_manager.all_connections, "Working client should not be removed"
