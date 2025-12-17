@@ -198,6 +198,9 @@
         "win_rate_reduction": 0.05,
         "max_bet_multiplier": 3
     },
+    "support": {
+        "email": "gamblelimitedsupport@taps-holdings.org"
+    },
     "rate_limit": {
         "enabled": true,
         "game_requests": "30/minute",
