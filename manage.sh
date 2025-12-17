@@ -188,11 +188,15 @@ function interact_config {
     
     read -p "Cloudflare Tunnel Token (optional): " CF_TOKEN
     
+    read -p "Support Email [support@gamblelimited.com]: " SUPPORT_EMAIL
+    SUPPORT_EMAIL=${SUPPORT_EMAIL:-support@gamblelimited.com}
+
     read -p "Enable Nginx Proxy? (y/N): " NGINX_OPT
     
     # Write Files
     echo "SECRET_KEY=${SECRET_KEY}" > .env
     echo "SERVER_PORT=${PORT}" >> .env
+    echo "SUPPORT_EMAIL=${SUPPORT_EMAIL}" >> .env
     [ -n "$CF_TOKEN" ] && echo "CF_TUNNEL_TOKEN=${CF_TOKEN}" >> .env
     
     # Generate config.json (simplified for brevity, ensuring key fields)

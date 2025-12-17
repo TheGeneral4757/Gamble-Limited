@@ -237,6 +237,10 @@ def load_config() -> AppConfig:
     
     if get_env("SECRET_KEY"):
         data.setdefault("security", {})["secret_key"] = get_env("SECRET_KEY")
+    if get_env("ADMIN_USERNAME"):
+        data.setdefault("security", {})["admin_username"] = get_env("ADMIN_USERNAME")
+    if get_env("ADMIN_PASSWORD_HASH"):
+        data.setdefault("security", {})["admin_password_hash"] = get_env("ADMIN_PASSWORD_HASH")
     if get_env("ADMIN_LOGIN_PATH"):
         data.setdefault("security", {})["admin_login_path"] = get_env("ADMIN_LOGIN_PATH")
     if get_env("SECURE_COOKIES"):
@@ -258,6 +262,9 @@ def load_config() -> AppConfig:
         data.setdefault("rate_limit", {})["game_requests"] = get_env("RATE_LIMIT_GAME_REQUESTS")
     if get_env("RATE_LIMIT_API_REQUESTS"):
         data.setdefault("rate_limit", {})["api_requests"] = get_env("RATE_LIMIT_API_REQUESTS")
+
+    if get_env("SUPPORT_EMAIL"):
+        data.setdefault("support", {})["email"] = get_env("SUPPORT_EMAIL")
     
     # Auto-hash password if it's not already hashed
     if "security" in data:
