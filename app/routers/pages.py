@@ -127,3 +127,18 @@ async def tos_page(request: Request):
 async def privacy_page(request: Request):
     user = get_current_user(request)
     return templates.TemplateResponse("privacy.html", get_base_context(request, user))
+
+
+@router.get("/support")
+async def support_page(request: Request):
+    """Support page accessible to all users."""
+    user = get_current_user(request)
+    ctx = get_base_context(request, user)
+    
+    # Pass support config
+    ctx.update({
+        "support_email": settings.support.email,
+        "games_list": [g for g in VALID_GAMES if g != "lottery"] + ["lottery"] # Ensure lottery is included
+    })
+    
+    return templates.TemplateResponse("support.html", ctx)

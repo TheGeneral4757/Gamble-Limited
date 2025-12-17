@@ -144,6 +144,11 @@ class GambleFridayConfig(BaseModel):
     max_bet_multiplier: int = 3  # 3x max bets
 
 
+class SupportConfig(BaseModel):
+    """Support page configuration."""
+    email: str = "support@gamblelimited.com"
+
+
 class LoggingConfig(BaseModel):
     level: str = "INFO"
     log_to_file: bool = False
@@ -173,6 +178,7 @@ class AppConfig(BaseModel):
     games: GamesConfig = Field(default_factory=GamesConfig)
     lottery: LotteryConfig = Field(default_factory=LotteryConfig)
     gamble_friday: GambleFridayConfig = Field(default_factory=GambleFridayConfig)
+    support: SupportConfig = Field(default_factory=SupportConfig)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)

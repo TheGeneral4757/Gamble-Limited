@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="support-container">
+    <div class="support-header">
+        <h1><span class="header-icon">🛠️</span> Support Center</h1>
+        <p>We're here to help! Please fill out the form below to contact our support team.</p>
+    </div>
+
+    <div class="support-card">
+        <form id="support-form" onsubmit="return false;">
+            <div class="form-group">
+                <label for="issue-type">What can we help you with?</label>
+                <select id="issue-type" class="form-input" onchange="handleIssueTypeChange()">
+                    <option value="" disabled selected>Select an option...</option>
+                    <option value="bug">🐛 Report a Bug</option>
+                    <option value="feature">💡 Request a Feature</option>
+                    <option value="account">👤 Account Issue</option>
+                    <option value="billing">💰 Billing / Economy</option>
+                    <option value="other">📝 Other</option>
+                </select>
+                <div class="field-desc">Choose the category that best fits your issue.</div>
+            </div>
+
+            <!-- BUG SECTIONS -->
+            <div id="bug-sections" class="dynamic-section" style="display: none;">
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label for="bug-location">Where is the bug happening?</label>
+                        <select id="bug-location" class="form-input">
+                            <option value="general">General Website</option>
+                            <option value="exchange">Exchange / Wallet</option>
+                            <option value="chat">Chat System</option>
+                            {% for game in games_list %}
+                            <option value="{{ game }}">{{ game|capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group half">
+                        <label for="bug-priority">Severity</label>
+                        <select id="bug-priority" class="form-input">
+                            <option value="low">Low - Visual glitch or minor</option>
+                            <option value="medium" selected>Medium - Feature broken</option>
+                            <option value="high">High - Game crash / Lost money</option>
+                            <option value="critical">Critical - Site down</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="bug-frequency">Frequency</label>
+                    <select id="bug-frequency" class="form-input">
+                        <option value="always">Every time</option>
+                        <option value="intermittent">Intermittent (Sometimes)</option>
+                        <option value="once">Once</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="bug-steps">Steps to Reproduce</label>
+                    <textarea id="bug-steps" class="form-input textarea-small"
+                        placeholder="1. Go to page...&#10;2. Click button...&#10;3. See error..."></textarea>
+                    <div class="field-desc">Step-by-step instructions to help us see the bug.</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label for="bug-expected">Expected Behavior</label>
+                        <input type="text" id="bug-expected" class="form-input"
+                            placeholder="What should have happened?">
+                    </div>
+                    <div class="form-group half">
+                        <label for="bug-actual">Actual Behavior</label>
+                        <input type="text" id="bug-actual" class="form-input" placeholder="What actually happened?">
+                    </div>
+                </div>
+            </div>
+
+            <!-- FEATURE SECTIONS -->
+            <div id="feature-sections" class="dynamic-section" style="display: none;">
+                <div class="form-group">
+                    <label for="feature-category">Category</label>
+                    <select id="feature-category" class="form-input">
+                        <option value="new_game">New Game Idea</option>
+                        <option value="improvement">Existing Feature Improvement</option>
+                        <option value="cosmetic">Visual / Cosmetic Change</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="feature-solution">Proposed Solution</label>
+                    <textarea id="feature-solution" class="form-input textarea-small"
+                        placeholder="Describe how it should work..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="feature-benefit">Benefit / Use Case</label>
+                    <input type="text" id="feature-benefit" class="form-input" placeholder="Why would this be cool?">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="subject">Subject</label>
+                <input type="text" id="subject" class="form-input" placeholder="Brief summary of the issue">
+            </div>
+
+            <div class="form-group">
+                <label for="message">Additional Details</label>
+                <textarea id="message" class="form-input textarea" rows="6"
+                    placeholder="Please provide any other relevant details..."></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button onclick="generateEmail()" class="btn-primary">
+                    📧 Send Email
+                </button>
+                <button onclick="copyToClipboard()" class="btn-secondary">
+                    📋 Copy Format
+                </button>
+            </div>
+
+            <div id="manual-email-info" class="manual-info">
+                <p>Or email us directly at: <a href="mailto:{{ support_email }}" class="highlight-link">{{ support_email
+                        }}</a></p>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .support-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 0 20px;
+    }
+
+    .support-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .support-header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        background: linear-gradient(135deg, #fff, #aaa);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .header-icon {
+        background: none;
+        -webkit-text-fill-color: initial;
+    }
+
+    .support-header p {
+        color: #888;
+        font-size: 1.1rem;
+    }
+
+    .support-card {
+        background: rgba(30, 30, 40, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 40px;
+        backdrop-filter: blur(10px);
+    }
+
+    .form-row {
+        display: flex;
+        gap: 20px;
+    }
+
+    .form-group.half {
+        flex: 1;
+    }
+
+    .form-group {
+        margin-bottom: 25px;
+        animation: fadeIn 0.5s ease;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #ccc;
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: white;
+        font-size: 1rem;
+        font-family: inherit;
+        transition: all 0.3s ease;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #00d4ff;
+        box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1);
+    }
+
+    .form-input.textarea {
+        resize: vertical;
+        min-height: 120px;
+    }
+
+    .form-input.textarea-small {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .field-desc {
+        font-size: 0.8rem;
+        color: #666;
+        margin-top: 6px;
+        margin-left: 2px;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+        padding: 14px 28px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 1rem;
+        border: none;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #00d4ff, #00a0cc);
+        color: #000;
+        flex: 2;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+    }
+
+    .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        flex: 1;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 15px;
+        margin-top: 30px;
+    }
+
+    .manual-info {
+        margin-top: 30px;
+        text-align: center;
+        color: #666;
+        font-size: 0.9rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        padding-top: 20px;
+    }
+
+    .highlight-link {
+        color: #00d4ff;
+        text-decoration: none;
+    }
+
+    .highlight-link:hover {
+        text-decoration: underline;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @media (max-width: 600px) {
+        .form-row {
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .support-card {
+            padding: 20px;
+        }
+    }
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const supportEmail = "{{ support_email }}";
+    const username = "{% if user %}{{ user.username }}{% else %}Guest{% endif %}";
+    const userId = "{% if user and user.user_id %}{{ user.user_id }}{% else %}N/A{% endif %}";
+
+    function handleIssueTypeChange() {
+        const type = document.getElementById('issue-type').value;
+        const bugSection = document.getElementById('bug-sections');
+        const featureSection = document.getElementById('feature-sections');
+
+        // Hide all first
+        bugSection.style.display = 'none';
+        featureSection.style.display = 'none';
+
+        if (type === 'bug') {
+            bugSection.style.display = 'block';
+        } else if (type === 'feature') {
+            featureSection.style.display = 'block';
+        }
+    }
+
+    function getFormattedBody() {
+        const type = document.getElementById('issue-type').value || "General";
+        const subject = document.getElementById('subject').value || "No Subject";
+        const message = document.getElementById('message').value || "";
+        const now = new Date().toISOString().replace('T', ' ').substring(0, 16);
+
+        let body = `======================================================
+GAMBLE LIMITED SUPPORT REQUEST
+======================================================
+
+[META_DATA]
+DATE       : ${now}
+USER       : ${username}
+USER_ID    : ${userId}
+PLATFORM   : ${navigator.userAgent}
+
+------------------------------------------------------
+TICKET INFORMATION
+------------------------------------------------------
+TYPE       : [${type.toUpperCase()}]
+SUBJECT    : "${subject}"
+`;
+
+        if (type === 'bug') {
+            const loc = document.getElementById('bug-location').value;
+            const pri = document.getElementById('bug-priority').value;
+            const freq = document.getElementById('bug-frequency').value;
+
+            body += `CATEGORY   : ${loc.toUpperCase()}
+PRIORITY   : ${pri.toUpperCase()}
+FREQUENCY  : ${freq}
+`;
+        } else if (type === 'feature') {
+            const cat = document.getElementById('feature-category').value;
+            body += `CATEGORY   : ${cat.toUpperCase()}
+`;
+        }
+
+        body += `
+------------------------------------------------------
+DESCRIPTION & DETAILS
+------------------------------------------------------
+${message}
+
+`;
+
+        if (type === 'bug') {
+            const steps = document.getElementById('bug-steps').value;
+            const expected = document.getElementById('bug-expected').value;
+            const actual = document.getElementById('bug-actual').value;
+
+            body += `------------------------------------------------------
+REPRODUCTION STEPS
+------------------------------------------------------
+${steps}
+
+EXPECTED BEHAVIOR:
+${expected}
+
+ACTUAL BEHAVIOR:
+${actual}
+`;
+        } else if (type === 'feature') {
+            const solution = document.getElementById('feature-solution').value;
+            const benefit = document.getElementById('feature-benefit').value;
+            body += `------------------------------------------------------
+PROPOSAL
+------------------------------------------------------
+SOLUTION:
+${solution}
+
+BENEFIT / USE CASE:
+${benefit}
+`;
+        }
+
+        body += `
+======================================================
+END OF MESSAGE
+======================================================`;
+
+        return body;
+    }
+
+    function generateEmail() {
+        if (!validateForm()) return;
+
+        const subject = `[${document.getElementById('issue-type').value.toUpperCase()}] ${document.getElementById('subject').value}`;
+        const body = getFormattedBody();
+
+        const mailtoLink = `mailto:${supportEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailtoLink;
+    }
+
+    function copyToClipboard() {
+        if (!validateForm()) return;
+
+        const body = getFormattedBody();
+        navigator.clipboard.writeText(body).then(() => {
+            const btn = document.querySelector('.btn-secondary');
+            const original = btn.innerHTML;
+            btn.innerHTML = "✅ Copied!";
+            setTimeout(() => btn.innerHTML = original, 2000);
+        });
+    }
+
+    function validateForm() {
+        const type = document.getElementById('issue-type').value;
+        if (!type) {
+            alert("Please select an issue type.");
+            return false;
+        }
+        return true;
+    }
+</script>
+{% endblock %}
