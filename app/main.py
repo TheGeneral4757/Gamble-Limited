@@ -22,7 +22,7 @@ from app.config import settings, PROJECT_ROOT
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.routers import pages, api, admin
-from app.routers.auth import router as auth_router
+from app.routers.auth import router as auth_router, get_current_user
 from app.core.websocket import ws_manager
 from app.core.scheduler import lottery_scheduler
 
@@ -153,10 +153,10 @@ async def websocket_endpoint(websocket: WebSocket):
     - Big win announcements
     - Global chat
     """
-    # Securely get user info from signed cookies
-    from app.routers.auth import get_current_user
-
+    # Get user info from secure cookie
     user = get_current_user(websocket)
+    user_id = user["user_id"] if user else None
+    username = user["username"] if user else "Guest"
     client_ip = websocket.client.host
 
     if user:

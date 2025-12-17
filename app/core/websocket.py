@@ -137,9 +137,7 @@ class ConnectionManager:
             return
 
         disconnected = []
-        connections_to_send = [
-            ws for ws in self.topics[topic] if ws != exclude
-        ]
+        connections_to_send = [ws for ws in self.all_connections if ws != exclude]
 
         for i in range(0, len(connections_to_send), batch_size):
             batch = connections_to_send[i : i + batch_size]
