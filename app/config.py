@@ -149,7 +149,7 @@ class GambleFridayConfig(BaseModel):
 
 class SupportConfig(BaseModel):
     """Support page configuration."""
-    email: str = "support@gamblelimited.com"
+    email: str = "gamblelimitedsupport@taps-holdings.org"
 
 
 class LoggingConfig(BaseModel):
