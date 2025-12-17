@@ -63,6 +63,7 @@ class ServerConfig(BaseModel):
     port: int = 8000
     debug: bool = True
     name: str = "Gamble Limited"
+    allowed_origins: list[str] = ["*"]
 
 
 class SecurityConfig(BaseModel):
@@ -71,6 +72,8 @@ class SecurityConfig(BaseModel):
     secret_key: str = "CHANGE_THIS_IN_PRODUCTION_PLEASE"
     admin_login_path: str = "/admin-portal"  # Hidden admin login URL
     house_login_path: str = "/the-house"  # Hidden house login URL
+    secure_cookies: bool = False  # Set to True in production with HTTPS
+    hsts_enabled: bool = False    # Set to True in production with HTTPS
 
 
 class EconomyConfig(BaseModel):
@@ -228,11 +231,18 @@ def load_config() -> AppConfig:
         data.setdefault("server", {})["port"] = get_env_int("SERVER_PORT", 8000)
     if get_env("DEBUG"):
         data.setdefault("server", {})["debug"] = get_env_bool("DEBUG")
+    if get_env("ALLOWED_ORIGINS"):
+        origins = get_env("ALLOWED_ORIGINS").split(",")
+        data.setdefault("server", {})["allowed_origins"] = [o.strip() for o in origins]
     
     if get_env("SECRET_KEY"):
         data.setdefault("security", {})["secret_key"] = get_env("SECRET_KEY")
     if get_env("ADMIN_LOGIN_PATH"):
         data.setdefault("security", {})["admin_login_path"] = get_env("ADMIN_LOGIN_PATH")
+    if get_env("SECURE_COOKIES"):
+        data.setdefault("security", {})["secure_cookies"] = get_env_bool("SECURE_COOKIES")
+    if get_env("HSTS_ENABLED"):
+        data.setdefault("security", {})["hsts_enabled"] = get_env_bool("HSTS_ENABLED")
     
     if get_env("DB_PATH"):
         data.setdefault("paths", {})["database"] = get_env("DB_PATH")

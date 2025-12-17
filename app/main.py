@@ -43,6 +43,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         
         # Prevent clickjacking
         response.headers["X-Frame-Options"] = "DENY"
+
+        # HSTS (HTTP Strict Transport Security)
+        if settings.security.hsts_enabled:
+            # 1 year max-age, include subdomains
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
         
         # Prevent MIME type sniffing
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -79,15 +85,15 @@ app = FastAPI(
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
 
-# CORS middleware (for development)
-if settings.server.debug:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# CORS middleware
+# Always enable but use tailored origins in production
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.server.allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Static files
 static_path = PROJECT_ROOT / "app" / "static"

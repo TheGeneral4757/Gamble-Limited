@@ -7,13 +7,13 @@ This document outlines the necessary steps to transition the **RNG-THING** appli
 ### Critical
 - [ ] **Secret Management**: Move `secret_key` and other sensitive values from `config.json` to environment variables or a secrets manager (e.g., Vault, AWS Secrets Manager).
 - [ ] **Database Credentials**: Ensure database passwords are strictly managed via environment variables.
-- [ ] **CORS Configuration**: The current configuration allows all origins (`allow_origins=["*"]`). In production, restrict this to the specific domain(s) of the frontend.
+- [x] **CORS Configuration**: The current configuration allows all origins (`allow_origins=["*"]`). In production, restrict this to the specific domain(s) of the frontend.
 - [ ] **CSRF Protection**: Implement Cross-Site Request Forgery `(CSRF)` protection for all form submissions (Login, Support, Game Actions).
-- [ ] **Secure Cookies**: Ensure all cookies are set with `Secure`, `HttpOnly`, and `SameSite` flags.
+- [x] **Secure Cookies**: Ensure all cookies are set with `Secure`, `HttpOnly`, and `SameSite` flags.
 - [ ] **Rate Limiting**: Review and tune `slowapi` limits to prevent abuse on auth and game endpoints.
 
 ### Recommended
-- [ ] **Security Headers**: Implement `HSTS`, `X-Frame-Options`, `X-Content-Type-Options`, and `Content-Security-Policy`.
+- [x] **Security Headers**: Implement `HSTS`, `X-Frame-Options`, `X-Content-Type-Options`, and `Content-Security-Policy`.
 - [ ] **Dependency Audit**: Run `pip-audit` to identify and update vulnerable dependencies.
 
 ## 2. Infrastructure & Deployment

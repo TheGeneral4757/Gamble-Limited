@@ -54,10 +54,22 @@ async def user_login(request: Request, username: str = Form(...), password: Opti
     
     # Set session cookie
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie("user_id", str(user["id"]), max_age=31536000)
-    response.set_cookie("username", user["username"], max_age=31536000)
-    response.set_cookie("is_admin", "0", max_age=31536000)
-    response.set_cookie("user_type", user.get("user_type", "user"), max_age=31536000)
+    response.set_cookie(
+        "user_id", str(user["id"]), max_age=31536000, 
+        secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+    )
+    response.set_cookie(
+        "username", user["username"], max_age=31536000, 
+        secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+    )
+    response.set_cookie(
+        "is_admin", "0", max_age=31536000, 
+        secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+    )
+    response.set_cookie(
+        "user_type", user.get("user_type", "user"), max_age=31536000, 
+        secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+    )
     
     return response
 
@@ -124,10 +136,22 @@ async def user_register(
     
     # Login the new user
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie("user_id", str(result["user_id"]), max_age=31536000)
-    response.set_cookie("username", username, max_age=31536000)
-    response.set_cookie("is_admin", "0", max_age=31536000)
-    response.set_cookie("user_type", "user", max_age=31536000)
+    response.set_cookie(
+        "user_id", str(result["user_id"]), max_age=31536000,
+        secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+    )
+    response.set_cookie(
+        "username", username, max_age=31536000,
+        secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+    )
+    response.set_cookie(
+        "is_admin", "0", max_age=31536000,
+        secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+    )
+    response.set_cookie(
+        "user_type", "user", max_age=31536000,
+        secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+    )
     
     return response
 
@@ -161,11 +185,26 @@ async def admin_login(request: Request, password: str = Form(...)):
     if db.verify_admin_password(password):
         logger.info("Admin logged in")
         response = RedirectResponse(url="/admin", status_code=303)
-        response.set_cookie("user_id", "0", max_age=31536000)
-        response.set_cookie("username", "Administrator", max_age=31536000)
-        response.set_cookie("is_admin", "1", max_age=31536000)
-        response.set_cookie("user_type", "admin", max_age=31536000)
-        response.set_cookie("admin_session", "authenticated", max_age=3600)  # 1 hour
+        response.set_cookie(
+            "user_id", "0", max_age=31536000,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )
+        response.set_cookie(
+            "username", "Administrator", max_age=31536000,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )
+        response.set_cookie(
+            "is_admin", "1", max_age=31536000,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )
+        response.set_cookie(
+            "user_type", "admin", max_age=31536000,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )
+        response.set_cookie(
+            "admin_session", "authenticated", max_age=3600,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )  # 1 hour
         return response
     
     logger.warning("Failed admin login attempt")
@@ -188,11 +227,26 @@ async def house_login(request: Request, password: str = Form(...)):
         
         logger.info("THE HOUSE logged in")
         response = RedirectResponse(url="/admin", status_code=303)
-        response.set_cookie("user_id", str(house_user["id"]) if house_user else "0", max_age=31536000)
-        response.set_cookie("username", "THE HOUSE", max_age=31536000)
-        response.set_cookie("is_admin", "1", max_age=31536000)
-        response.set_cookie("user_type", "house", max_age=31536000)
-        response.set_cookie("admin_session", "authenticated", max_age=3600)
+        response.set_cookie(
+            "user_id", str(house_user["id"]) if house_user else "0", max_age=31536000,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )
+        response.set_cookie(
+            "username", "THE HOUSE", max_age=31536000,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )
+        response.set_cookie(
+            "is_admin", "1", max_age=31536000,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )
+        response.set_cookie(
+            "user_type", "house", max_age=31536000,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )
+        response.set_cookie(
+            "admin_session", "authenticated", max_age=3600,
+            secure=settings.security.secure_cookies, httponly=True, samesite="lax"
+        )
         return response
     
     logger.warning("Failed HOUSE login attempt")
