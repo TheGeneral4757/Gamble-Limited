@@ -502,8 +502,14 @@ def run_all_tests():
         asyncio.run(test_login_sets_signature())
         asyncio.run(test_websocket_valid_signature())
         asyncio.run(test_websocket_invalid_signature())
+        from tests.test_auth import test_websocket_rate_limiter
+
         asyncio.run(test_websocket_missing_signature())
         asyncio.run(test_websocket_tampered_cookie())
+
+        print("\n🛡️ Game Warden Anti-Cheat Tests")
+        print("-" * 40)
+        asyncio.run(test_websocket_rate_limiter())
 
     except Exception as e:
         print(f"\n❌ Test suite crashed: {e}")

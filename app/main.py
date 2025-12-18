@@ -16,6 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 import uvicorn
 import json
+import time
+from collections import deque
 
 from app.core.logger import init_logging, get_logger
 from app.config import settings, PROJECT_ROOT
@@ -34,6 +36,12 @@ init_logging(
 )
 logger = get_logger("main")
 ws_logger = get_logger("websocket")
+
+
+# WebSocket Rate Limiting
+WS_MAX_MESSAGES = 10  # Max messages per user
+WS_RATE_LIMIT_SECONDS = 2  # In this time window
+ws_rate_limiter = {}  # In-memory store: user_id -> deque of timestamps
 
 
 # ==================== Security Headers Middleware ====================
@@ -178,10 +186,39 @@ async def websocket_endpoint(websocket: WebSocket):
         "WebSocket connected", extra={"user_id": user_id, "client_ip": client_ip}
     )
 
+    # Initialize rate limiter for the user
+    if user_id not in ws_rate_limiter:
+        ws_rate_limiter[user_id] = deque()
+
     try:
         while True:
             # Receive message
             data = await websocket.receive_text()
+
+            # --- Game Warden: WebSocket Rate Limiting ---
+            current_time = time.time()
+            user_timestamps = ws_rate_limiter.get(user_id)
+
+            if user_timestamps is not None:
+                # Remove old timestamps
+                while (
+                    user_timestamps
+                    and user_timestamps[0] < current_time - WS_RATE_LIMIT_SECONDS
+                ):
+                    user_timestamps.popleft()
+
+                # Check if limit is exceeded
+                if len(user_timestamps) >= WS_MAX_MESSAGES:
+                    ws_logger.warning(
+                        "WebSocket rate limit exceeded",
+                        extra={"user_id": user_id, "client_ip": client_ip},
+                    )
+                    # Silently drop the message by skipping the processing loop
+                    continue
+
+                # Add current message timestamp
+                user_timestamps.append(current_time)
+            # --- End WebSocket Rate Limiting ---
 
             try:
                 message = json.loads(data)
@@ -212,6 +249,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect as e:
         ws_manager.disconnect(websocket, user_id)
+        if user_id in ws_rate_limiter:
+            del ws_rate_limiter[user_id]  # Clean up rate-limiter memory
         ws_logger.info(
             "WebSocket disconnected",
             extra={
@@ -224,6 +263,8 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.warning(f"WebSocket error: {e}")
         ws_manager.disconnect(websocket, user_id)
+        if user_id in ws_rate_limiter:
+            del ws_rate_limiter[user_id]  # Clean up rate-limiter memory
         ws_logger.error(
             "WebSocket error",
             extra={"user_id": user_id, "client_ip": client_ip, "error": str(e)},
