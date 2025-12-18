@@ -144,6 +144,32 @@ logger.info(f"Admin login path: {settings.security.admin_login_path}")
 # ==================== WebSocket Endpoint ====================
 
 
+async def _handle_chat_message(websocket: WebSocket, message: dict, username: str):
+    """Handle incoming chat messages."""
+    content = message.get("message", "").strip()
+    if content and len(content) <= 200:
+        await ws_manager.add_chat_message(username, content)
+
+
+async def _handle_ping(websocket: WebSocket, message: dict):
+    """Handle incoming ping messages for keep-alive."""
+    await websocket.send_json({"type": "pong"})
+
+
+async def _handle_subscribe(websocket: WebSocket, message: dict):
+    """Handle subscription requests to a topic."""
+    topic = message.get("topic")
+    if topic:
+        await ws_manager.subscribe(websocket, topic)
+
+
+async def _handle_unsubscribe(websocket: WebSocket, message: dict):
+    """Handle unsubscription requests from a topic."""
+    topic = message.get("topic")
+    if topic:
+        await ws_manager.unsubscribe(websocket, topic)
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """
@@ -178,37 +204,28 @@ async def websocket_endpoint(websocket: WebSocket):
         "WebSocket connected", extra={"user_id": user_id, "client_ip": client_ip}
     )
 
+    # Refactor: Use a dispatch table for clarity and extensibility
+    message_handlers = {
+        "chat": lambda msg: _handle_chat_message(websocket, msg, username),
+        "ping": lambda msg: _handle_ping(websocket, msg),
+        "subscribe": lambda msg: _handle_subscribe(websocket, msg),
+        "unsubscribe": lambda msg: _handle_unsubscribe(websocket, msg),
+    }
+
     try:
         while True:
-            # Receive message
             data = await websocket.receive_text()
-
             try:
                 message = json.loads(data)
                 msg_type = message.get("type")
-
-                if msg_type == "chat" and username:
-                    # Handle chat message
-                    content = message.get("message", "").strip()
-                    if content and len(content) <= 200:
-                        await ws_manager.add_chat_message(username, content)
-
-                elif msg_type == "ping":
-                    # Keep-alive ping
-                    await websocket.send_json({"type": "pong"})
-
-                elif msg_type == "subscribe":
-                    topic = message.get("topic")
-                    if topic:
-                        await ws_manager.subscribe(websocket, topic)
-
-                elif msg_type == "unsubscribe":
-                    topic = message.get("topic")
-                    if topic:
-                        await ws_manager.unsubscribe(websocket, topic)
-
+                handler = message_handlers.get(msg_type)
+                if handler:
+                    await handler(message)
             except json.JSONDecodeError:
-                pass
+                ws_logger.warning(
+                    "Received invalid JSON over WebSocket",
+                    extra={"client_ip": client_ip, "data": data},
+                )
 
     except WebSocketDisconnect as e:
         ws_manager.disconnect(websocket, user_id)
