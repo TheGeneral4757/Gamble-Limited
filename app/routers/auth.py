@@ -1,4 +1,6 @@
 import json
+import hmac
+import hashlib
 from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -8,6 +10,7 @@ from datetime import timedelta
 from app.core.database import db
 from app.config import settings, PROJECT_ROOT
 from app.core.logger import get_logger
+from app.routers.api import limiter
 
 logger = get_logger("auth")
 
@@ -45,6 +48,7 @@ async def auth_page(
 
 
 @router.post("/auth/login")
+@limiter.limit("10/minute")
 async def user_login(
     request: Request, username: str = Form(...), password: Optional[str] = Form(None)
 ):
@@ -105,6 +109,7 @@ async def user_login(
 
 
 @router.post("/auth/register")
+@limiter.limit("10/minute")
 async def user_register(
     request: Request,
     username: str = Form(...),
@@ -202,10 +207,6 @@ async def user_register(
     }
 
     # Login the new user
-    user_id = str(result["user_id"])
-    user_type = "user"
-    signature = create_signature(user_id, username, user_type)
-
     response = RedirectResponse(url="/", status_code=303)
     session_cookie = signer.sign(json.dumps(session_data).encode("utf-8"))
     response.set_cookie(
@@ -253,6 +254,7 @@ async def hidden_house_page(request: Request, error: str = None):
 
 
 @router.post("/auth/admin-login")
+@limiter.limit("10/minute")
 async def admin_login(request: Request, password: str = Form(...)):
     """Admin login with password."""
     if db.verify_admin_password(password):
