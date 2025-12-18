@@ -1,0 +1,106 @@
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Initializing database at /app/data/casino.db
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Migrating: Adding last_daily_cash column
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Migrating: Adding banned_until column
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Migrating: Adding ban_reason column
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Migrating: Adding user_type column
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Creating THE HOUSE user
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing[0m | Logging initialized at INFO level
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.main[0m | uvloop installed and enabled.
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.main[0m | Application 'Gamble Limited' initialized
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.main[0m | Debug mode: True
+[90m2025-12-18 23:01:39[0m | [92mINFO    [0m | [96mrng-thing.main[0m | Admin login path: /admin-portal
+
+==================================================
+🧪 RNG-THING Automated Test Suite
+==================================================
+Started at: 2025-12-18 23:01:39
+INFO:     Started server process [2559]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8123 (Press CTRL+C to quit)
+
+⚙️ Configuration Tests
+----------------------------------------
+  ✓ Config loads
+  ✓ Economy settings
+  ✓ Security settings
+  ✓ ODDS-CHANGER.json exists
+
+📊 Database Tests
+----------------------------------------
+  ✓ Database connection
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: test5uex7ev5
+  ✓ Create user
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: testvpt80co3
+  ✓ Login user
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: testqzcfeaoz
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | User 4 banned until 2025-12-19T00:01:40.430898: Test ban
+  ✓ Ban user
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: testgx177ttq
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | User 5 banned until 2025-12-19T00:01:40.433986: Test ban
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | User 5 unbanned
+  ✓ Unban user
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: testjo715s7j
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | User 6 claimed daily bonus: 100.0 credits
+  ✓ Daily bonus claim
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: testr36b177j
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | User 7 claimed daily cash: 50.0
+  ✓ Daily cash claim
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: test6a90v5rh
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | User 8 claimed daily bonus: 100.0 credits
+  ✓ Daily bonus race condition
+  ✓ THE HOUSE user exists
+  ✓ House cut tracking
+
+🎰 Game Logic Tests
+----------------------------------------
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.odds[0m | Loaded game odds from ODDS-CHANGER.json
+Traceback (most recent call last):
+  File "/app/tests/test_all.py", line 61, in sync_wrapper
+    func()
+  File "/app/tests/test_all.py", line 442, in test_batched_broadcast
+    asyncio.run(run_test())
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1517, in uvloop.loop.Loop.run_until_complete
+  File "/app/tests/test_all.py", line 402, in run_test
+    await ws_manager.broadcast(
+          ^^^^^^^^^^^^^^^^^^^^^
+TypeError: ConnectionManager.broadcast() missing 1 required positional argument: 'message'
+  ✓ Slots game spin
+  ✓ Plinko game drop
+  ✓ Coinflip game
+  ✓ Roulette game spin
+  ✓ Blackjack deal
+
+🔌 WebSocket Tests
+----------------------------------------
+  ✓ WebSocket manager exists
+  ✓ Chat history tracking
+  ✗ Batched broadcast sends to all: TypeError: ConnectionManager.broadcast() missing 1 required positional argument: 'message'
+
+🔐 Authentication & Authorization Tests
+----------------------------------------
+[90m2025-12-18 23:01:40[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: testu70rt13n
+[90m2025-12-18 23:01:41[0m | [92mINFO    [0m | [96mrng-thing.auth[0m | User logged in: testu70rt13n
+  ✗ Successful login sets signature cookie: Signature cookie not found
+[90m2025-12-18 23:01:41[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: test8f0yw8fc
+[90m2025-12-18 23:01:41[0m | [92mINFO    [0m | [96mrng-thing.auth[0m | User logged in: test8f0yw8fc
+INFO:     ('127.0.0.1', 48496) - "WebSocket /ws" [accepted]
+[90m2025-12-18 23:01:41[0m | [92mINFO    [0m | [96mrng-thing.websocket[0m | WebSocket connected: user_id=10, total=151
+[90m2025-12-18 23:01:41[0m | [92mINFO    [0m | [96mrng-thing.websocket[0m | WebSocket connected
+INFO:     connection open
+  ✓ WebSocket connection with valid signature
+[90m2025-12-18 23:01:41[0m | [92mINFO    [0m | [96mrng-thing.websocket[0m | WebSocket disconnected: total=150
+[90m2025-12-18 23:01:41[0m | [92mINFO    [0m | [96mrng-thing.websocket[0m | WebSocket disconnected
+INFO:     connection closed
+[90m2025-12-18 23:01:42[0m | [92mINFO    [0m | [96mrng-thing.database[0m | Created new user: testmdmqpvgx
+[90m2025-12-18 23:01:42[0m | [92mINFO    [0m | [96mrng-thing.auth[0m | User logged in: testmdmqpvgx
+INFO:     ('127.0.0.1', 48506) - "WebSocket /ws" [accepted]
+[90m2025-12-18 23:01:42[0m | [92mINFO    [0m | [96mrng-thing.websocket[0m | WebSocket connected: user_id=11, total=151
+[90m2025-12-18 23:01:42[0m | [92mINFO    [0m | [96mrng-thing.websocket[0m | WebSocket connected
+INFO:     connection open
