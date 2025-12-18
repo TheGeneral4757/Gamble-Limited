@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 import uvicorn
 import json
+import uuid
 
 from app.core.logger import init_logging, get_logger
 from app.config import settings, PROJECT_ROOT
@@ -153,6 +154,7 @@ async def websocket_endpoint(websocket: WebSocket):
     - Big win announcements
     - Global chat
     """
+    connection_id = str(uuid.uuid4())
     # Get user info from secure cookie
     user = get_current_user(websocket)
     user_id = user["user_id"] if user else None
@@ -166,7 +168,7 @@ async def websocket_endpoint(websocket: WebSocket):
         # Deny connection if user is not authenticated
         ws_logger.warning(
             "WebSocket connection denied due to invalid auth",
-            extra={"client_ip": client_ip},
+            extra={"client_ip": client_ip, "connection_id": connection_id},
         )
         await websocket.accept()
         await websocket.send_json({"type": "error", "message": "Authentication failed"})
@@ -175,7 +177,12 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await ws_manager.connect(websocket, user_id)
     ws_logger.info(
-        "WebSocket connected", extra={"user_id": user_id, "client_ip": client_ip}
+        "WebSocket connected",
+        extra={
+            "user_id": user_id,
+            "client_ip": client_ip,
+            "connection_id": connection_id,
+        },
     )
 
     try:
@@ -219,6 +226,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 "client_ip": client_ip,
                 "ws_disconnect_code": e.code,
                 "ws_disconnect_reason": e.reason,
+                "connection_id": connection_id,
             },
         )
     except Exception as e:
@@ -226,7 +234,12 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket, user_id)
         ws_logger.error(
             "WebSocket error",
-            extra={"user_id": user_id, "client_ip": client_ip, "error": str(e)},
+            extra={
+                "user_id": user_id,
+                "client_ip": client_ip,
+                "error": str(e),
+                "connection_id": connection_id,
+            },
         )
 
 
