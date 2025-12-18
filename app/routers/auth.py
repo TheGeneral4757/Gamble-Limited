@@ -351,7 +351,7 @@ def get_current_user(request: Request) -> dict:
 
     try:
         # Verify the cookie signature and timestamp (max_age = 30 days)
-        data = signer.unsign(session_cookie.encode("utf-8"), max_age=timedelta(days=30))
+        data = signer.unsign(session_cookie.encode("utf-8"), max_age=int(timedelta(days=30).total_seconds()))
         session_data = json.loads(data.decode("utf-8"))
 
         # Add 'is_house' for convenience

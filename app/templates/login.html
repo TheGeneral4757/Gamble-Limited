@@ -25,7 +25,7 @@
                 <div class="form-group">
                     <label for="login-username">Username</label>
                     <input type="text" id="login-username" name="username" required placeholder="Enter your username"
-                        autocomplete="username">
+                        autocomplete="username" autofocus>
                 </div>
                 <div class="form-group">
                     <label for="login-password">Password <span class="optional">(if set)</span></label>
@@ -34,7 +34,7 @@
                             autocomplete="current-password">
                         <span class="password-toggle"
                             onclick="togglePasswordVisibility('login-password', this)" role="button"
-                            aria-label="Show password" tabindex="0">👁️</span>
+                            aria-label="Show password" aria-pressed="false" tabindex="0">👁️</span>
                     </div>
                 </div>
                 <button type="submit" class="auth-btn">🎮 Enter Casino</button>
@@ -60,7 +60,7 @@
                             minlength="6" autocomplete="new-password">
                         <span class="password-toggle"
                             onclick="togglePasswordVisibility('reg-password', this)" role="button"
-                            aria-label="Show password" tabindex="0">👁️</span>
+                            aria-label="Show password" aria-pressed="false" tabindex="0">👁️</span>
                     </div>
                 </div>
                 <div class="form-group" id="confirm-group" style="display: none;">
@@ -70,7 +70,7 @@
                             placeholder="Confirm your password" autocomplete="new-password">
                         <span class="password-toggle"
                             onclick="togglePasswordVisibility('reg-password-confirm', this)"
-                            role="button" aria-label="Show password" tabindex="0">👁️</span>
+                            role="button" aria-label="Show password" aria-pressed="false" tabindex="0">👁️</span>
                     </div>
                 </div>
                 <p class="form-hint">You'll start with $1000 cash and 500 credits!</p>
@@ -98,7 +98,7 @@
                             placeholder="Enter admin password">
                         <span class="password-toggle"
                             onclick="togglePasswordVisibility('admin-password', this)" role="button"
-                            aria-label="Show password" tabindex="0">👁️</span>
+                            aria-label="Show password" aria-pressed="false" tabindex="0">👁️</span>
                     </div>
                 </div>
                 <button type="submit" class="auth-btn admin">🔐 Admin Login</button>
@@ -118,7 +118,7 @@
                         <input type="password" id="house-password" name="password" required placeholder="Enter password">
                         <span class="password-toggle"
                             onclick="togglePasswordVisibility('house-password', this)" role="button"
-                            aria-label="Show password" tabindex="0">👁️</span>
+                            aria-label="Show password" aria-pressed="false" tabindex="0">👁️</span>
                     </div>
                 </div>
                 <button type="submit" class="auth-btn house">🏛️ THE HOUSE Login</button>
@@ -180,6 +180,7 @@
         passwordInput.type = isPassword ? 'text' : 'password';
         toggleEl.textContent = isPassword ? '🙈' : '👁️';
         toggleEl.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+        toggleEl.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
     }
 
     document.querySelectorAll('.password-toggle').forEach(toggle => {
