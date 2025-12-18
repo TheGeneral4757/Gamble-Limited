@@ -136,6 +136,26 @@ Your casino platform is now running on port 8000.
 
 ---
 
+## 🛠️ Production Management (`manage.sh`)
+
+For production environments, the `manage.sh` script is the recommended tool for managing the application lifecycle. It provides a simple, menu-driven interface for common administrative tasks.
+
+**Key Features:**
+- **Automated Setup:** Installs required dependencies like Docker, `jq`, and `git`.
+- **Guided Configuration:** Interactive prompts for setting up your `.env` and `config.json` files.
+- **Application Lifecycle:** Start, stop, and view logs for your application containers.
+- **Automatic Updates:** Safely pulls the latest changes from the Git repository.
+- **Data Management:** Perform a factory reset to clear all user data.
+
+### Usage
+The script must be run as root.
+
+```bash
+sudo bash manage.sh
+```
+
+---
+
 ## ⚙️ Configuration
 
 The application's configuration is managed through a combination of environment variables and JSON files, allowing for both security and flexibility.
