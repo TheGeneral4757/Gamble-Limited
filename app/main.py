@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 import uvicorn
-import json
+import orjson as json
 import time
 from collections import deque
 
@@ -207,7 +207,7 @@ async def websocket_endpoint(websocket: WebSocket):
             extra={"client_ip": client_ip},
         )
         await websocket.accept()
-        await websocket.send_json({"type": "error", "message": "Authentication failed"})
+        await websocket.send_bytes(json.dumps({"type": "error", "message": "Authentication failed"}))
         await websocket.close()
         return
 
@@ -223,7 +223,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # Receive message
-            data = await websocket.receive_text()
+            data = await websocket.receive_bytes()
 
             # --- Game Warden: WebSocket Rate Limiting ---
             current_time = time.time()
@@ -263,7 +263,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 elif msg_type == "ping":
                     # Keep-alive ping
-                    await websocket.send_json({"type": "pong"})
+                    await websocket.send_bytes(json.dumps({"type": "pong"}))
 
                 elif msg_type == "subscribe":
                     topic = message.get("topic")
