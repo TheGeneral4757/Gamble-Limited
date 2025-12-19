@@ -8,19 +8,19 @@
             <p>Welcome to the casino!</p>
         </div>
 
-        <div class="auth-tabs">
-            <button class="auth-tab active" onclick="showTab('login')">Login</button>
-            <button class="auth-tab" onclick="showTab('register')">New Player</button>
+        <div class="auth-tabs" role="tablist">
+            <button id="login-tab-button" class="auth-tab {% if not is_admin and not is_house %}active{% endif %}" role="tab" aria-selected="{{ 'true' if not is_admin and not is_house else 'false' }}" aria-controls="login-tab-panel" onclick="showTab('login')">Login</button>
+            <button id="register-tab-button" class="auth-tab" role="tab" aria-selected="false" aria-controls="register-tab-panel" onclick="showTab('register')">New Player</button>
             {% if is_admin %}
-            <button class="auth-tab admin-tab active" onclick="showTab('admin')">🔐 Admin</button>
+            <button id="admin-tab-button" class="auth-tab admin-tab {% if is_admin %}active{% endif %}" role="tab" aria-selected="{{ 'true' if is_admin else 'false' }}" aria-controls="admin-tab-panel" onclick="showTab('admin')">🔐 Admin</button>
             {% endif %}
             {% if is_house %}
-            <button class="auth-tab house-tab active" onclick="showTab('house')">🏛️ House</button>
+            <button id="house-tab-button" class="auth-tab house-tab {% if is_house %}active{% endif %}" role="tab" aria-selected="{{ 'true' if is_house else 'false' }}" aria-controls="house-tab-panel" onclick="showTab('house')">🏛️ House</button>
             {% endif %}
         </div>
 
         <!-- Login Tab -->
-        <div id="login-tab" class="auth-form {% if not is_admin and not is_house %}active{% endif %}">
+        <div id="login-tab-panel" class="auth-form {% if not is_admin and not is_house %}active{% endif %}" role="tabpanel" aria-labelledby="login-tab-button">
             <form action="/auth/login" method="POST">
                 <div class="form-group">
                     <label for="login-username">Username</label>
@@ -45,7 +45,7 @@
         </div>
 
         <!-- Register Tab -->
-        <div id="register-tab" class="auth-form">
+        <div id="register-tab-panel" class="auth-form" role="tabpanel" aria-labelledby="register-tab-button">
             <form action="/auth/register" method="POST">
                 <div class="form-group">
                     <label for="reg-username">Choose Username</label>
@@ -89,7 +89,7 @@
         </div>
 
         <!-- Admin Tab (hidden unless accessed via special route) -->
-        <div id="admin-tab" class="auth-form {% if is_admin %}active{% endif %}">
+        <div id="admin-tab-panel" class="auth-form {% if is_admin %}active{% endif %}" role="tabpanel" aria-labelledby="admin-tab-button">
             <form action="/auth/admin-login" method="POST">
                 <div class="form-group">
                     <label for="admin-password">Admin Password</label>
@@ -110,7 +110,7 @@
         </div>
 
         <!-- House Tab (hidden unless accessed via /the-house) -->
-        <div id="house-tab" class="auth-form {% if is_house %}active{% endif %}">
+        <div id="house-tab-panel" class="auth-form {% if is_house %}active{% endif %}" role="tabpanel" aria-labelledby="house-tab-button">
             <form action="/auth/house-login" method="POST">
                 <div class="form-group">
                     <label for="house-password">House Password</label>
@@ -140,13 +140,24 @@
 {% block scripts %}
 <script>
     function showTab(tab) {
-        // Hide all tabs
-        document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
-        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        // Hide all tab panels and update aria-selected on all tabs
+        document.querySelectorAll('[role="tabpanel"]').forEach(panel => {
+            panel.classList.remove('active');
+        });
+        document.querySelectorAll('[role="tab"]').forEach(t => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+        });
 
-        // Show selected
-        document.getElementById(tab + '-tab').classList.add('active');
-        event.target.classList.add('active');
+        // Show selected tab and panel
+        const tabButton = document.getElementById(tab + '-tab-button');
+        const tabPanel = document.getElementById(tab + '-tab-panel');
+
+        if (tabButton && tabPanel) {
+            tabButton.classList.add('active');
+            tabButton.setAttribute('aria-selected', 'true');
+            tabPanel.classList.add('active');
+        }
     }
 
     // Show password confirm when password is entered
@@ -165,14 +176,6 @@
     if (window.location.search.includes('registered=1')) {
         showTab('login');
     }
-
-    // Show admin/house tab if flags set
-    {% if is_admin %}
-    showTab('admin');
-    {% endif %}
-    {% if is_house %}
-    showTab('house');
-    {% endif %}
 
     function togglePasswordVisibility(inputId, toggleEl) {
         const passwordInput = document.getElementById(inputId);
