@@ -10,6 +10,30 @@ A full-featured, self-hosted casino gaming platform built with Python and FastAP
 
 ---
 
+## ⚡ Quickstart: Run Locally
+
+From the root of the repository, run the following commands to set up and start the development server:
+
+```bash
+# Run setup script (creates venv, installs deps, generates .env)
+bash scripts/setup_dev.sh
+
+# Activate the virtual environment
+source venv/bin/activate
+
+# Create a test user (testuser / password)
+python scripts/create_test_user.py
+
+# Run the server
+python -m app.main
+```
+
+After the server starts, you can **login** at [http://localhost:8000](http://localhost:8000) with:
+-   **Username:** `testuser`
+-   **Password:** `password`
+
+---
+
 ## ✨ Features
 
 ### 🎮 Games Included
