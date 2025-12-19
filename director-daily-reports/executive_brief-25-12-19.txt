@@ -1,0 +1,7 @@
+**Subject: Daily Director Brief — 2025-12-19**
+
+Immediate attention is required to address two critical issues: a persistent vulnerability in the `starlette` dependency (CVE-2025-54121, CVE-2025-62727) and a critical failure in the user authentication flow. These issues pose a significant security risk and impact core functionality. Please prioritize the review and deployment of fixes.
+
+-   **[CRITICAL] Upgrade `starlette` Dependency:** The `starlette` library has two known vulnerabilities. An upgrade to a patched version is required immediately.
+-   **[CRITICAL] Fix Failing Authentication Test:** The "Successful login sets signature cookie" test is failing, indicating a critical bug in the authentication process.
+-   **[HIGH] Fix Failing WebSocket Broadcast Test:** A `TypeError` in the WebSocket broadcast functionality is breaking real-time features.
