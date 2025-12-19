@@ -196,28 +196,26 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
 
             # --- Game Warden: WebSocket Rate Limiting ---
+            # This check is performed BEFORE any message processing to prevent
+            # resource exhaustion from spam. It applies to all message types.
             current_time = time.time()
-            user_timestamps = ws_rate_limiter.get(user_id)
+            user_timestamps = ws_rate_limiter[user_id]  # Should always exist here
 
-            if user_timestamps is not None:
-                # Remove old timestamps
-                while (
-                    user_timestamps
-                    and user_timestamps[0] < current_time - WS_RATE_LIMIT_SECONDS
-                ):
-                    user_timestamps.popleft()
+            # Prune old timestamps
+            while user_timestamps and user_timestamps[0] < current_time - WS_RATE_LIMIT_SECONDS:
+                user_timestamps.popleft()
 
-                # Check if limit is exceeded
-                if len(user_timestamps) >= WS_MAX_MESSAGES:
-                    ws_logger.warning(
-                        "WebSocket rate limit exceeded",
-                        extra={"user_id": user_id, "client_ip": client_ip},
-                    )
-                    # Silently drop the message by skipping the processing loop
-                    continue
+            # Check if limit is exceeded
+            if len(user_timestamps) >= WS_MAX_MESSAGES:
+                ws_logger.warning(
+                    "WebSocket rate limit exceeded",
+                    extra={"user_id": user_id, "client_ip": client_ip},
+                )
+                # Silently drop the message to avoid giving feedback to spammers
+                continue
 
-                # Add current message timestamp
-                user_timestamps.append(current_time)
+            # Add current message timestamp
+            user_timestamps.append(current_time)
             # --- End WebSocket Rate Limiting ---
 
             try:
