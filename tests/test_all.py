@@ -87,7 +87,7 @@ def test(name):
 # ==================== Database Tests ====================
 
 
-def run_database_tests():
+async def run_database_tests():
     print("\n📊 Database Tests")
     print("-" * 40)
 
@@ -99,25 +99,25 @@ def run_database_tests():
         assert conn is not None, "Failed to get connection"
 
     @test("Create user")
-    def test_create_user():
-        result = db.create_user(random_username())
+    async def test_create_user():
+        result = await db.create_user(random_username())
         assert result["success"], f"Failed: {result.get('error')}"
         assert "user_id" in result, "Missing user_id in response"
         return result["user_id"]
 
     @test("Login user")
-    def test_login():
+    async def test_login():
         username = random_username()
-        create_result = db.create_user(username)
+        create_result = await db.create_user(username)
         assert create_result["success"], f"Create failed: {create_result.get('error')}"
-        user = db.login_user(username)
+        user = await db.login_user(username)
         assert user is not None, "User not found"
         assert user["username"] == username
 
     @test("Ban user")
-    def test_ban():
+    async def test_ban():
         username = random_username()
-        result = db.create_user(username)
+        result = await db.create_user(username)
         assert result["success"], f"Create failed: {result.get('error')}"
         user_id = result["user_id"]
 
@@ -125,26 +125,26 @@ def run_database_tests():
         assert ban_result["success"], "Ban failed"
 
         # Check login returns banned status
-        user = db.login_user(username)
+        user = await db.login_user(username)
         assert user.get("banned"), "User should be banned"
 
     @test("Unban user")
-    def test_unban():
+    async def test_unban():
         username = random_username()
-        result = db.create_user(username)
+        result = await db.create_user(username)
         assert result["success"], f"Create failed: {result.get('error')}"
         user_id = result["user_id"]
 
         db.ban_user(user_id, hours=1, reason="Test ban")
         db.unban_user(user_id)
 
-        user = db.login_user(username)
+        user = await db.login_user(username)
         assert not user.get("banned"), "User should not be banned"
 
     @test("Daily bonus claim")
-    def test_daily_bonus():
+    async def test_daily_bonus():
         username = random_username()
-        result = db.create_user(username)
+        result = await db.create_user(username)
         assert result["success"], f"Create failed: {result.get('error')}"
         user_id = result["user_id"]
 
@@ -156,9 +156,9 @@ def run_database_tests():
         assert not bonus2["success"], "Second claim should fail"
 
     @test("Daily cash claim")
-    def test_daily_cash():
+    async def test_daily_cash():
         username = random_username()
-        result = db.create_user(username)
+        result = await db.create_user(username)
         assert result["success"], f"Create failed: {result.get('error')}"
         user_id = result["user_id"]
 
@@ -166,12 +166,12 @@ def run_database_tests():
         assert cash["success"], f"Claim failed: {cash.get('error')}"
 
     @test("Daily bonus race condition")
-    def test_daily_bonus_race_condition():
+    async def test_daily_bonus_race_condition():
         import threading
         from app.core.database import db
 
         username = random_username()
-        result = db.create_user(username)
+        result = await db.create_user(username)
         assert result["success"], f"Create failed: {result.get('error')}"
         user_id = result["user_id"]
 
@@ -220,13 +220,13 @@ def run_database_tests():
         assert after > before, "House balance should increase"
 
     test_connection()
-    test_create_user()
-    test_login()
-    test_ban()
-    test_unban()
-    test_daily_bonus()
-    test_daily_cash()
-    test_daily_bonus_race_condition()
+    await test_create_user()
+    await test_login()
+    await test_ban()
+    await test_unban()
+    await test_daily_bonus()
+    await test_daily_cash()
+    await test_daily_bonus_race_condition()
     test_house_user()
     test_house_cut()
 
@@ -346,7 +346,7 @@ def run_config_tests():
 # ==================== WebSocket Tests ====================
 
 
-def run_websocket_tests():
+async def run_websocket_tests():
     print("\n🔌 WebSocket Tests")
     print("-" * 40)
 
@@ -368,8 +368,7 @@ def run_websocket_tests():
         assert hasattr(history, "__len__"), "Chat history should be iterable"
 
     @test("Batched broadcast sends to all")
-    def test_batched_broadcast():
-        import asyncio
+    async def test_batched_broadcast():
         from unittest.mock import patch, AsyncMock
         from app.core.websocket import ws_manager
 
@@ -378,72 +377,70 @@ def run_websocket_tests():
                 self.send_count = 0
                 self.should_fail = should_fail
 
-            async def send_json(self, data):
+            async def send_bytes(self, data):
                 if self.should_fail:
                     raise ConnectionError("Failed to send")
                 self.send_count += 1
 
-        async def run_test():
-            # Reset connections for clean test
-            ws_manager.all_connections.clear()
-            ws_manager.active_connections.clear()
-            for topic in ws_manager.topics.values():
-                topic.clear()
+        # Reset connections for clean test
+        ws_manager.all_connections.clear()
+        ws_manager.active_connections.clear()
+        for topic in ws_manager.topics.values():
+            topic.clear()
 
-            num_connections = 150
-            batch_size = 50
+        num_connections = 150
+        batch_size = 50
 
-            connections = [MockWebSocket() for _ in range(num_connections)]
-            for ws in connections:
-                ws_manager.all_connections.add(ws)
-                ws_manager.topics["chat"].add(ws)
+        connections = [MockWebSocket() for _ in range(num_connections)]
+        for ws in connections:
+            ws_manager.all_connections.add(ws)
+            ws_manager.topics["chat"].add(ws)
 
-            with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            # The _send_with_error_handling now calls _send_json, which calls send_bytes
+            with patch.object(ws_manager, "_send_json", new_callable=AsyncMock) as mock_send:
                 await ws_manager.broadcast(
-                    {"type": "test"}, batch_size=batch_size, delay=0.001
+                    "chat", {"type": "test"}, batch_size=batch_size, delay=0.001
                 )
 
                 # Check all messages were sent
-                total_sends = sum(ws.send_count for ws in connections)
                 assert (
-                    total_sends == num_connections
-                ), f"Expected {num_connections} sends, got {total_sends}"
+                    mock_send.call_count == num_connections
+                ), f"Expected {num_connections} sends, got {mock_send.call_count}"
 
-                # Check that sleep was called between batches
-                num_batches = (num_connections + batch_size - 1) // batch_size
-                expected_sleeps = num_batches - 1 if num_batches > 1 else 0
-                assert (
-                    mock_sleep.call_count == expected_sleeps
-                ), f"Expected {expected_sleeps} sleeps, got {mock_sleep.call_count}"
-
-            # Test disconnected client cleanup
-            ws_manager.all_connections.clear()
-            for topic in ws_manager.topics.values():
-                topic.clear()
-            failing_ws = MockWebSocket(should_fail=True)
-            working_ws = MockWebSocket()
-            ws_manager.all_connections.add(failing_ws)
-            ws_manager.topics["chat"].add(failing_ws)
-            ws_manager.all_connections.add(working_ws)
-            ws_manager.topics["chat"].add(working_ws)
-
-            assert len(ws_manager.all_connections) == 2
-            await ws_manager.broadcast({"type": "cleanup_test"})
+            # Check that sleep was called between batches
+            num_batches = (num_connections + batch_size - 1) // batch_size
+            expected_sleeps = num_batches - 1 if num_batches > 1 else 0
             assert (
-                len(ws_manager.all_connections) == 1
-            ), "Failed to remove disconnected client"
-            assert (
-                failing_ws not in ws_manager.all_connections
-            ), "Failed client should be removed"
-            assert (
-                working_ws in ws_manager.all_connections
-            ), "Working client should not be removed"
+                mock_sleep.call_count == expected_sleeps
+            ), f"Expected {expected_sleeps} sleeps, got {mock_sleep.call_count}"
 
-        asyncio.run(run_test())
+        # Test disconnected client cleanup
+        ws_manager.all_connections.clear()
+        for topic in ws_manager.topics.values():
+            topic.clear()
+        failing_ws = MockWebSocket(should_fail=True)
+        working_ws = MockWebSocket()
+        ws_manager.all_connections.add(failing_ws)
+        ws_manager.topics["chat"].add(failing_ws)
+        ws_manager.all_connections.add(working_ws)
+        ws_manager.topics["chat"].add(working_ws)
+
+        assert len(ws_manager.all_connections) == 2
+        await ws_manager.broadcast("chat", {"type": "cleanup_test"})
+        assert (
+            len(ws_manager.all_connections) == 1
+        ), "Failed to remove disconnected client"
+        assert (
+            failing_ws not in ws_manager.all_connections
+        ), "Failed client should be removed"
+        assert (
+            working_ws in ws_manager.all_connections
+        ), "Working client should not be removed"
 
     test_ws_manager()
     test_chat_history()
-    test_batched_broadcast()
+    await test_batched_broadcast()
 
 
 import uvicorn
@@ -473,7 +470,7 @@ class TestServer(threading.Thread):
 # ==================== Run All Tests ====================
 
 
-def run_all_tests():
+async def run_all_tests():
     print("\n" + "=" * 50)
     print("🧪 RNG-THING Automated Test Suite")
     print("=" * 50)
@@ -493,23 +490,23 @@ def run_all_tests():
         )
 
         run_config_tests()
-        run_database_tests()
+        await run_database_tests()
         run_game_tests()
-        run_websocket_tests()
+        await run_websocket_tests()
 
         print("\n🔐 Authentication & Authorization Tests")
         print("-" * 40)
-        asyncio.run(test_login_sets_signature())
-        asyncio.run(test_websocket_valid_signature())
-        asyncio.run(test_websocket_invalid_signature())
+        await test_login_sets_signature()
+        await test_websocket_valid_signature()
+        await test_websocket_invalid_signature()
         from tests.test_auth import test_websocket_rate_limiter
 
-        asyncio.run(test_websocket_missing_signature())
-        asyncio.run(test_websocket_tampered_cookie())
+        await test_websocket_missing_signature()
+        await test_websocket_tampered_cookie()
 
         print("\n🛡️ Game Warden Anti-Cheat Tests")
         print("-" * 40)
-        asyncio.run(test_websocket_rate_limiter())
+        await test_websocket_rate_limiter()
 
     except Exception as e:
         print(f"\n❌ Test suite crashed: {e}")
@@ -539,5 +536,5 @@ def run_all_tests():
 
 
 if __name__ == "__main__":
-    success = run_all_tests()
+    success = asyncio.run(run_all_tests())
     sys.exit(0 if success else 1)
