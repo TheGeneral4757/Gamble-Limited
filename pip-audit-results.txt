@@ -1,0 +1,4 @@
+Name      Version ID             Fix Versions
+--------- ------- -------------- ------------
+starlette 0.41.3  CVE-2025-54121 0.47.2
+starlette 0.41.3  CVE-2025-62727 0.49.1
