@@ -4,6 +4,7 @@ Uses SQLite for user balances, transaction history, and game statistics.
 Enhanced with username-based login and admin system.
 """
 
+import asyncio
 import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict
@@ -274,7 +275,7 @@ class Database:
 
     # ==================== User Authentication ====================
 
-    def create_user(self, username: str, password: str = None) -> Dict:
+    async def create_user(self, username: str, password: str = None) -> Dict:
         """Create a new user with username and optional password."""
         import bcrypt
 
@@ -294,9 +295,11 @@ class Database:
         # Hash password if provided
         password_hash = None
         if password:
-            password_hash = bcrypt.hashpw(
-                password.encode("utf-8"), bcrypt.gensalt()
-            ).decode("utf-8")
+            # Loadout: Move blocking bcrypt call to a thread to avoid blocking the event loop.
+            password_hash = await asyncio.to_thread(
+                bcrypt.hashpw, password.encode("utf-8"), bcrypt.gensalt()
+            )
+            password_hash = password_hash.decode("utf-8")
 
         cursor.execute(
             """
@@ -335,7 +338,7 @@ class Database:
             return ""
         return username
 
-    def login_user(self, username: str, password: str = None) -> Optional[Dict]:
+    async def login_user(self, username: str, password: str = None) -> Optional[Dict]:
         """Login existing user by username and password."""
         import bcrypt
 
@@ -355,9 +358,13 @@ class Database:
             if not password:
                 return None  # Password required but not provided
             try:
-                if not bcrypt.checkpw(
-                    password.encode("utf-8"), user["password_hash"].encode("utf-8")
-                ):
+                # Loadout: Move blocking bcrypt call to a thread.
+                is_valid = await asyncio.to_thread(
+                    bcrypt.checkpw,
+                    password.encode("utf-8"),
+                    user["password_hash"].encode("utf-8"),
+                )
+                if not is_valid:
                     return None  # Wrong password
             except Exception:
                 return None
@@ -403,7 +410,7 @@ class Database:
 
     # ==================== Admin Authentication ====================
 
-    def verify_admin_password(self, password: str) -> bool:
+    async def verify_admin_password(self, password: str) -> bool:
         """Verify admin password using bcrypt against config.json."""
         import bcrypt
         from app.config import settings
@@ -413,8 +420,11 @@ class Database:
         # Check if it's a bcrypt hash
         if stored_hash.startswith("$2"):
             try:
-                return bcrypt.checkpw(
-                    password.encode("utf-8"), stored_hash.encode("utf-8")
+                # Loadout: Move blocking bcrypt call to a thread.
+                return await asyncio.to_thread(
+                    bcrypt.checkpw,
+                    password.encode("utf-8"),
+                    stored_hash.encode("utf-8"),
                 )
             except Exception:
                 return False

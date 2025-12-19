@@ -27,19 +27,22 @@ db._init_db()
 async def get_cookies(username, password):
     """Helper to login and get cookies."""
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        db.create_user(username, password)
+    # Loadout: Disable follow_redirects to capture the cookie from the initial 303 response
+    async with AsyncClient(
+        transport=transport, base_url="http://test", follow_redirects=False
+    ) as client:
+        await db.create_user(username, password)
         response = await client.post(
             "/auth/login", data={"username": username, "password": password}
         )
         return {k: v for k, v in response.cookies.items()}
 
 
-@test("Successful login sets signature cookie")
+@test("Successful login sets session cookie")
 async def test_login_sets_signature():
-    """Verify that a successful login returns a `signature` cookie."""
+    """Verify that a successful login returns a `session` cookie."""
     cookies = await get_cookies(random_username(), "password123")
-    assert "signature" in cookies, "Signature cookie not found"
+    assert "session" in cookies, "Session cookie not found"
 
 
 from tests.test_all import TEST_HOST, TEST_PORT
@@ -58,8 +61,9 @@ async def test_websocket_valid_signature():
     cookies = await get_cookies(random_username(), "password123")
     try:
         ws = await ws_connect_with_cookies(cookies)
+        # Successful connection means the test passes, just close it.
         await ws.close()
-    except websockets.exceptions.InvalidStatusCode as e:
+    except Exception as e:
         assert False, f"WebSocket disconnected unexpectedly: {e}"
 
 
@@ -67,7 +71,7 @@ async def test_websocket_valid_signature():
 async def test_websocket_invalid_signature():
     """Test that a WebSocket connection is rejected with an invalid signature."""
     cookies = await get_cookies(random_username(), "password123")
-    cookies["signature"] = "invalid_signature"
+    cookies["session"] = "invalid_signature"  # Tamper with the session cookie
     ws = await ws_connect_with_cookies(cookies)
     response = await ws.recv()
     data = json.loads(response)
@@ -80,7 +84,7 @@ async def test_websocket_invalid_signature():
 async def test_websocket_missing_signature():
     """Test that a WebSocket connection is rejected if the signature is missing."""
     cookies = await get_cookies(random_username(), "password123")
-    del cookies["signature"]
+    del cookies["session"]
     ws = await ws_connect_with_cookies(cookies)
     response = await ws.recv()
     data = json.loads(response)

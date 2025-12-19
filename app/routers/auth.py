@@ -53,7 +53,7 @@ async def user_login(
     request: Request, username: str = Form(...), password: Optional[str] = Form(None)
 ):
     """Login existing user with optional password."""
-    user = db.login_user(username.strip(), password)
+    user = await db.login_user(username.strip(), password)
 
     if not user:
         return templates.TemplateResponse(
@@ -184,7 +184,7 @@ async def user_register(
                 },
             )
 
-    result = db.create_user(username, password)
+    result = await db.create_user(username, password)
 
     if not result["success"]:
         return templates.TemplateResponse(
@@ -257,7 +257,7 @@ async def hidden_house_page(request: Request, error: str = None):
 @limiter.limit("10/minute")
 async def admin_login(request: Request, password: str = Form(...)):
     """Admin login with password."""
-    if db.verify_admin_password(password):
+    if await db.verify_admin_password(password):
         logger.info("Admin logged in")
 
         # Create session data for admin
@@ -297,7 +297,7 @@ async def admin_login(request: Request, password: str = Form(...)):
 @router.post("/auth/house-login")
 async def house_login(request: Request, password: str = Form(...)):
     """THE HOUSE login with admin password."""
-    if db.verify_admin_password(password):
+    if await db.verify_admin_password(password):
         house_user = db.get_house_user()
         if not house_user:
             # Trigger migration to create house user
