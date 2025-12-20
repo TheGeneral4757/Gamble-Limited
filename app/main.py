@@ -38,9 +38,10 @@ logger = get_logger("main")
 ws_logger = get_logger("websocket")
 
 
-# WebSocket Rate Limiting
+# WebSocket Rate Limiting & Sizing
 WS_MAX_MESSAGES = 10  # Max messages per user
 WS_RATE_LIMIT_SECONDS = 2  # In this time window
+WS_MAX_MESSAGE_SIZE_BYTES = 4 * 1024  # 4KB max message size
 ws_rate_limiter = {}  # In-memory store: user_id -> deque of timestamps
 
 
@@ -207,7 +208,9 @@ async def websocket_endpoint(websocket: WebSocket):
             extra={"client_ip": client_ip},
         )
         await websocket.accept()
-        await websocket.send_bytes(json.dumps({"type": "error", "message": "Authentication failed"}))
+        await websocket.send_bytes(
+            json.dumps({"type": "error", "message": "Authentication failed"})
+        )
         await websocket.close()
         return
 
@@ -224,6 +227,21 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             # Receive message
             data = await websocket.receive_bytes()
+
+            # --- Game Warden: WebSocket Message Size Limiting ---
+            if len(data) > WS_MAX_MESSAGE_SIZE_BYTES:
+                ws_logger.warning(
+                    "WebSocket message size limit exceeded, disconnecting client.",
+                    extra={
+                        "user_id": user_id,
+                        "client_ip": client_ip,
+                        "message_size": len(data),
+                        "limit": WS_MAX_MESSAGE_SIZE_BYTES,
+                    },
+                )
+                await websocket.close(code=1009)  # 1009: Message Too Big
+                break  # Exit the loop to ensure disconnection
+            # --- End WebSocket Message Size Limiting ---
 
             # --- Game Warden: WebSocket Rate Limiting ---
             current_time = time.time()
