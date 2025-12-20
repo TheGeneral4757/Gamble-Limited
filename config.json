@@ -208,6 +208,7 @@
     },
     "logging": {
         "level": "INFO",
+        "formatter": "json",
         "log_to_file": true
     }
 }

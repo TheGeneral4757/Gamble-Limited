@@ -18,6 +18,7 @@ import uvicorn
 import orjson as json
 import time
 from collections import deque
+import secrets
 
 from app.core.logger import init_logging, get_logger
 from app.config import settings, PROJECT_ROOT
@@ -42,6 +43,28 @@ ws_logger = get_logger("websocket")
 WS_MAX_MESSAGES = 10  # Max messages per user
 WS_RATE_LIMIT_SECONDS = 2  # In this time window
 ws_rate_limiter = {}  # In-memory store: user_id -> deque of timestamps
+
+
+# ==================== CSRF Middleware ====================
+
+
+class CSRFMiddleware(BaseHTTPMiddleware):
+    """Simple CSRF protection using a double-submit cookie."""
+
+    async def dispatch(self, request: Request, call_next):
+        csrf_cookie = request.cookies.get("csrf_token")
+        response = await call_next(request)
+
+        if not csrf_cookie:
+            new_token = secrets.token_hex(16)
+            response.set_cookie(
+                "csrf_token",
+                new_token,
+                httponly=True,
+                samesite="Lax",
+                secure=not settings.server.debug,
+            )
+        return response
 
 
 # ==================== Security Headers Middleware ====================
@@ -106,6 +129,9 @@ def create_app() -> FastAPI:
 
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # Add CSRF middleware
+    app.add_middleware(CSRFMiddleware)
 
     # Add security headers middleware
     app.add_middleware(SecurityHeadersMiddleware)
@@ -212,6 +238,7 @@ async def websocket_endpoint(websocket: WebSocket):
         return
 
     await ws_manager.connect(websocket, user_id)
+    websocket.state.connected_at = time.time()  # Record connection start time
     ws_logger.info(
         "WebSocket connected", extra={"user_id": user_id, "client_ip": client_ip}
     )
@@ -282,6 +309,12 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket, user_id)
         if user_id in ws_rate_limiter:
             del ws_rate_limiter[user_id]  # Clean up rate-limiter memory
+
+        # Calculate connection duration
+        duration_s = -1
+        if hasattr(websocket.state, "connected_at"):
+            duration_s = round(time.time() - websocket.state.connected_at, 2)
+
         ws_logger.info(
             "WebSocket disconnected",
             extra={
@@ -289,6 +322,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 "client_ip": client_ip,
                 "ws_disconnect_code": e.code,
                 "ws_disconnect_reason": normalize_ws_close_code(e.code),
+                "connection_duration_s": duration_s,
             },
         )
     except Exception as e:
