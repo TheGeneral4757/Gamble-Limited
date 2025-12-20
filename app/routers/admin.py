@@ -55,7 +55,7 @@ class SetJackpotRequest(BaseModel):
 @router.get("")
 async def admin_panel(request: Request):
     """Admin dashboard."""
-    user = require_admin(request)
+    user = await require_admin(request)
     if not user:
         return RedirectResponse(url="/auth", status_code=303)
 
