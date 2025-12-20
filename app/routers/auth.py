@@ -1,3 +1,4 @@
+import asyncio
 import json
 import hmac
 import hashlib
@@ -345,44 +346,54 @@ async def logout(request: Request):
     return response
 
 
-def get_current_user(request: Request) -> dict:
-    """Get current user from a secure, signed cookie."""
+async def get_current_user(request: Request) -> dict:
+    """
+    Get current user from a secure, signed cookie.
+    Bolt: This is now async to avoid blocking the event loop on crypto.
+    """
     session_cookie = request.cookies.get("session")
     if not session_cookie:
         return None
 
-    try:
-        # Verify the cookie signature and timestamp (max_age = 30 days)
-        max_age_seconds = int(timedelta(days=30).total_seconds())
-        data = signer.unsign(
-            session_cookie.encode("utf-8"), max_age=max_age_seconds
-        )
-        session_data = json.loads(data.decode("utf-8"))
+    def _unsign_cookie():
+        """Synchronous part of the cookie verification."""
+        try:
+            max_age_seconds = int(timedelta(days=30).total_seconds())
+            data = signer.unsign(
+                session_cookie.encode("utf-8"), max_age=max_age_seconds
+            )
+            return json.loads(data.decode("utf-8"))
+        except (SignatureExpired, BadTimeSignature, json.JSONDecodeError):
+            return None
 
+    # Bolt: Run the synchronous, CPU-bound crypto in a threadpool
+    session_data = await asyncio.to_thread(_unsign_cookie)
+
+    if session_data:
         # Add 'is_house' for convenience
         session_data["is_house"] = session_data.get("user_type") == "house"
 
-        return session_data
-
-    except (SignatureExpired, BadTimeSignature, json.JSONDecodeError):
-        # Invalid or expired cookie
-        return None
+    return session_data
 
 
-def require_login(request: Request):
+async def require_login(request: Request):
     """Check if user is logged in, redirect if not."""
-    user = get_current_user(request)
+    user = await get_current_user(request)
     if not user:
+        # Use a dependency that can raise an exception for API routes
+        # or handle redirection for web routes. For now, redirect.
         return RedirectResponse(url="/auth", status_code=303)
     return user
 
 
-def require_admin(request: Request):
+async def require_admin(request: Request):
     """Check if user is admin or house."""
-    user = get_current_user(request)
+    user = await get_current_user(request)
 
-    if not user or not user["is_admin"]:
-        return None
+    if not user or not user.get("is_admin"):
+        # For dependencies, it's better to raise an exception for API routes
+        # or return None/redirect for page routes.
+        return None  # Or raise HTTPException for APIs
     return user
 
 
