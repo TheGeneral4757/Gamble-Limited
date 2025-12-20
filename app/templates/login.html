@@ -32,9 +32,9 @@
                     <div class="input-wrapper">
                         <input type="password" id="login-password" name="password" placeholder="Enter your password"
                             autocomplete="current-password">
-                        <span class="password-toggle"
-                            onclick="togglePasswordVisibility('login-password', this)" role="button"
-                            aria-label="Show password" tabindex="0">👁️</span>
+                        <button type="button" class="password-toggle"
+                            onclick="togglePasswordVisibility('login-password', this)"
+                            aria-label="Show password">👁️</button>
                     </div>
                 </div>
                 <button type="submit" class="auth-btn">🎮 Enter Casino</button>
@@ -58,9 +58,9 @@
                     <div class="input-wrapper">
                         <input type="password" id="reg-password" name="password" placeholder="Create a password"
                             minlength="6" autocomplete="new-password">
-                        <span class="password-toggle"
-                            onclick="togglePasswordVisibility('reg-password', this)" role="button"
-                            aria-label="Show password" tabindex="0">👁️</span>
+                        <button type="button" class="password-toggle"
+                            onclick="togglePasswordVisibility('reg-password', this)"
+                            aria-label="Show password">👁️</button>
                     </div>
                 </div>
                 <div class="form-group" id="confirm-group" style="display: none;">
@@ -68,9 +68,9 @@
                     <div class="input-wrapper">
                         <input type="password" id="reg-password-confirm" name="password_confirm"
                             placeholder="Confirm your password" autocomplete="new-password">
-                        <span class="password-toggle"
+                        <button type="button" class="password-toggle"
                             onclick="togglePasswordVisibility('reg-password-confirm', this)"
-                            role="button" aria-label="Show password" tabindex="0">👁️</span>
+                            aria-label="Show password">👁️</button>
                     </div>
                 </div>
                 <p class="form-hint">You'll start with $1000 cash and 500 credits!</p>
@@ -96,9 +96,9 @@
                     <div class="input-wrapper">
                         <input type="password" id="admin-password" name="password" required
                             placeholder="Enter admin password">
-                        <span class="password-toggle"
-                            onclick="togglePasswordVisibility('admin-password', this)" role="button"
-                            aria-label="Show password" tabindex="0">👁️</span>
+                        <button type="button" class="password-toggle"
+                            onclick="togglePasswordVisibility('admin-password', this)"
+                            aria-label="Show password">👁️</button>
                     </div>
                 </div>
                 <button type="submit" class="auth-btn admin">🔐 Admin Login</button>
@@ -116,9 +116,9 @@
                     <label for="house-password">House Password</label>
                     <div class="input-wrapper">
                         <input type="password" id="house-password" name="password" required placeholder="Enter password">
-                        <span class="password-toggle"
-                            onclick="togglePasswordVisibility('house-password', this)" role="button"
-                            aria-label="Show password" tabindex="0">👁️</span>
+                        <button type="button" class="password-toggle"
+                            onclick="togglePasswordVisibility('house-password', this)"
+                            aria-label="Show password">👁️</button>
                     </div>
                 </div>
                 <button type="submit" class="auth-btn house">🏛️ THE HOUSE Login</button>
@@ -185,14 +185,6 @@
         toggleEl.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
     }
 
-    document.querySelectorAll('.password-toggle').forEach(toggle => {
-        toggle.addEventListener('keydown', function (event) {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                this.click();
-            }
-        });
-    });
 </script>
 
 <style>
@@ -400,6 +392,15 @@
 
     .password-toggle:hover {
         opacity: 1;
+    }
+
+    /* Reset button styles for password toggle */
+    .password-toggle {
+        background: transparent;
+        border: none;
+        padding: 0;
+        font-family: inherit;
+        color: inherit;
     }
 </style>
 {% endblock %}
