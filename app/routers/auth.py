@@ -295,6 +295,7 @@ async def admin_login(request: Request, password: str = Form(...)):
 
 
 @router.post("/auth/house-login")
+@limiter.limit("10/minute")
 async def house_login(request: Request, password: str = Form(...)):
     """THE HOUSE login with admin password."""
     if await db.verify_admin_password(password):
