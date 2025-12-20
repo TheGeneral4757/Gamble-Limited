@@ -130,8 +130,17 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(auth_router)
     app.include_router(pages.router)
+    app.include_router(pages.public_router)
     app.include_router(api.router, prefix="/api")
     app.include_router(admin.router, prefix="/admin")
+
+    # Add custom exception handler for redirects
+    from app.core.exceptions import RedirectException
+    from fastapi.responses import RedirectResponse
+
+    @app.exception_handler(RedirectException)
+    async def redirect_exception_handler(request: Request, exc: RedirectException):
+        return RedirectResponse(url=exc.url, status_code=exc.status_code)
 
     return app
 

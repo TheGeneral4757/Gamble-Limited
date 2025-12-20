@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.config import settings, PROJECT_ROOT
-from app.routers.auth import get_current_user
+from app.routers.auth import get_current_user, get_user_or_redirect
 from app.core.gamble_friday import gamble_friday
 
-router = APIRouter()
+# This router requires authentication for all its routes
+router = APIRouter(dependencies=[Depends(get_user_or_redirect)])
+
+# This router is for pages that can be viewed by anyone
+public_router = APIRouter()
+
+
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "app" / "templates"))
 
 VALID_GAMES = {
@@ -35,10 +41,7 @@ def get_base_context(request: Request, user=None) -> dict:
 
 
 @router.get("/")
-async def home(request: Request):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/auth", status_code=303)
+async def home(request: Request, user: dict = Depends(get_current_user)):
 
     games_data = (
         settings.games.model_dump()
@@ -83,10 +86,7 @@ async def home(request: Request):
 
 
 @router.get("/game/{game_name}")
-async def game_page(request: Request, game_name: str):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/auth", status_code=303)
+async def game_page(request: Request, game_name: str, user: dict = Depends(get_current_user)):
 
     games_data = (
         settings.games.model_dump()
@@ -127,50 +127,35 @@ async def game_page(request: Request, game_name: str):
 
 
 @router.get("/exchange")
-async def exchange_page(request: Request):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/auth", status_code=303)
-
+async def exchange_page(request: Request, user: dict = Depends(get_current_user)):
     return templates.TemplateResponse("exchange.html", get_base_context(request, user))
 
 
 @router.get("/history")
-async def history_page(request: Request):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/auth", status_code=303)
-
+async def history_page(request: Request, user: dict = Depends(get_current_user)):
     return templates.TemplateResponse("history.html", get_base_context(request, user))
 
 
 @router.get("/leaderboard")
-async def leaderboard_page(request: Request):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/auth", status_code=303)
-
+async def leaderboard_page(request: Request, user: dict = Depends(get_current_user)):
     return templates.TemplateResponse(
         "leaderboard.html", get_base_context(request, user)
     )
 
 
-@router.get("/tos")
-async def tos_page(request: Request):
-    user = get_current_user(request)
+@public_router.get("/tos")
+async def tos_page(request: Request, user: dict = Depends(get_current_user)):
     return templates.TemplateResponse("tos.html", get_base_context(request, user))
 
 
-@router.get("/privacy")
-async def privacy_page(request: Request):
-    user = get_current_user(request)
+@public_router.get("/privacy")
+async def privacy_page(request: Request, user: dict = Depends(get_current_user)):
     return templates.TemplateResponse("privacy.html", get_base_context(request, user))
 
 
-@router.get("/support")
-async def support_page(request: Request):
+@public_router.get("/support")
+async def support_page(request: Request, user: dict = Depends(get_current_user)):
     """Support page accessible to all users."""
-    user = get_current_user(request)
     ctx = get_base_context(request, user)
 
     # Pass support config

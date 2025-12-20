@@ -369,11 +369,14 @@ def get_current_user(request: Request) -> dict:
         return None
 
 
-def require_login(request: Request):
-    """Check if user is logged in, redirect if not."""
+from app.core.exceptions import RedirectException
+
+
+def get_user_or_redirect(request: Request):
+    """Dependency to get user or redirect to auth page."""
     user = get_current_user(request)
     if not user:
-        return RedirectResponse(url="/auth", status_code=303)
+        raise RedirectException(url="/auth", status_code=303)
     return user
 
 
