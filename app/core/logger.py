@@ -6,6 +6,7 @@ Provides colored console output and optional file logging with rotation.
 import logging
 import sys
 import json
+import os
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from typing import Optional
@@ -78,6 +79,9 @@ class JsonFormatter(logging.Formatter):
         if extra_fields:
             log_record.update(extra_fields)
 
+        with open("json.log", "a") as f:
+            f.write(json.dumps(log_record) + "\n")
+
         return json.dumps(log_record)
 
 
@@ -115,7 +119,11 @@ def setup_logger(
     # Console handler with colors
     console_handler = logging.StreamHandler(sys.stdout)
 
-    if formatter == "json":
+    # Allow overriding formatter with env var, useful for `uvicorn --reload`
+    log_formatter_override = os.environ.get("LOG_FORMATTER")
+    final_formatter = log_formatter_override or formatter
+
+    if final_formatter == "json":
         console_handler.setFormatter(JsonFormatter())
     else:
         console_handler.setFormatter(ColoredFormatter())
@@ -133,7 +141,7 @@ def setup_logger(
             file_handler = RotatingFileHandler(
                 log_file_path, maxBytes=max_file_size, backupCount=backup_count
             )
-            file_handler.setFormatter(PlainFormatter())
+            file_handler.setFormatter(JsonFormatter())
             logger.addHandler(file_handler)
         except (OSError, PermissionError) as e:
             # Fallback to console only if file access fails
