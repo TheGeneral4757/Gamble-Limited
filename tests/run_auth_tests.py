@@ -10,11 +10,12 @@ import traceback
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.main import app
-from tests.test_all import test, results
+from tests.test_all import results
 
 # ==================== Test Server ====================
 TEST_PORT = 8123
 TEST_HOST = "127.0.0.1"
+
 
 class TestServer(threading.Thread):
     def __init__(self):
@@ -29,6 +30,7 @@ class TestServer(threading.Thread):
     def shutdown(self):
         if self.server:
             self.server.should_exit = True
+
 
 # ==================== Main Runner ====================
 def run_focused_tests():
@@ -66,11 +68,10 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Test suite crashed: {e}")
         traceback.print_exc()
-        results['failed'] += 1
+        results["failed"] += 1
     finally:
         server.shutdown()
         server.join(timeout=2)
-
 
     # Summary
     print("\n" + "=" * 50)

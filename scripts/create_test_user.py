@@ -1,11 +1,11 @@
 import sys
 import os
+from app.core.database import db
 
 # Add the project root to the Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from app.core.database import db
 
 def create_test_user():
     """Creates a test user with default credentials."""
@@ -22,6 +22,7 @@ def create_test_user():
         print(f"Successfully created user '{username}' with password '{password}'.")
     else:
         print(f"Failed to create user: {result.get('error')}")
+
 
 if __name__ == "__main__":
     create_test_user()

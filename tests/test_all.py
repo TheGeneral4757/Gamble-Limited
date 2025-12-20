@@ -5,13 +5,18 @@ Run with: python -m tests.test_all
 
 import sys
 import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import asyncio
+import threading
+import time
+import uvicorn
 from datetime import datetime
 import traceback
 import random
 import string
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app.main import app
 
 # Test results tracking
 results = {"passed": 0, "failed": 0, "tests": []}
@@ -21,8 +26,6 @@ def random_username():
     """Generate a valid random username for tests."""
     return "test" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
-
-import asyncio
 
 def test(name):
     """Decorator to mark test functions."""
@@ -52,6 +55,7 @@ def test(name):
                     print(f"  ✗ {name}: {type(e).__name__}: {e}")
                     traceback.print_exc()
                     return False
+
             async_wrapper.__name__ = func.__name__
             return async_wrapper
         else:
@@ -78,6 +82,7 @@ def test(name):
                     print(f"  ✗ {name}: {type(e).__name__}: {e}")
                     traceback.print_exc()
                     return False
+
             sync_wrapper.__name__ = func.__name__
             return sync_wrapper
 
@@ -167,7 +172,6 @@ async def run_database_tests():
 
     @test("Daily bonus race condition")
     async def test_daily_bonus_race_condition():
-        import threading
         from app.core.database import db
 
         username = random_username()
@@ -398,7 +402,9 @@ async def run_websocket_tests():
 
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             # The _send_with_error_handling now calls _send_json, which calls send_bytes
-            with patch.object(ws_manager, "_send_json", new_callable=AsyncMock) as mock_send:
+            with patch.object(
+                ws_manager, "_send_json", new_callable=AsyncMock
+            ) as mock_send:
                 await ws_manager.broadcast(
                     "chat", {"type": "test"}, batch_size=batch_size, delay=0.001
                 )
@@ -443,11 +449,6 @@ async def run_websocket_tests():
     await test_batched_broadcast()
 
 
-import uvicorn
-import threading
-import time
-from app.main import app
-
 TEST_PORT = 8123
 TEST_HOST = "127.0.0.1"
 
@@ -487,7 +488,9 @@ async def run_all_tests():
             test_websocket_invalid_signature,
             test_websocket_missing_signature,
             test_websocket_tampered_cookie,
+            test_websocket_rate_limiter,
         )
+        from tests.test_game_warden import test_websocket_rejects_oversized_message
 
         run_config_tests()
         await run_database_tests()
@@ -499,14 +502,13 @@ async def run_all_tests():
         await test_login_sets_signature()
         await test_websocket_valid_signature()
         await test_websocket_invalid_signature()
-        from tests.test_auth import test_websocket_rate_limiter
-
         await test_websocket_missing_signature()
         await test_websocket_tampered_cookie()
 
         print("\n🛡️ Game Warden Anti-Cheat Tests")
         print("-" * 40)
         await test_websocket_rate_limiter()
+        await test_websocket_rejects_oversized_message()
 
     except Exception as e:
         print(f"\n❌ Test suite crashed: {e}")

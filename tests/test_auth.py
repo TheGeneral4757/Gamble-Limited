@@ -1,20 +1,19 @@
 """
 Authentication and Authorization Tests for RNG-THING
 """
+
 import sys
 import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import asyncio
 import json
 import websockets
 from httpx import AsyncClient, ASGITransport
-from starlette.websockets import WebSocketDisconnect
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.main import app
 from app.core.database import db
-from tests.test_all import test, random_username
+from tests.test_all import test, random_username, TEST_HOST, TEST_PORT
 
 # Use a test-specific database
 DB_PATH = "data/test_casino.db"
@@ -44,8 +43,6 @@ async def test_login_sets_signature():
     cookies = await get_cookies(random_username(), "password123")
     assert "session" in cookies, "Session cookie not found"
 
-
-from tests.test_all import TEST_HOST, TEST_PORT
 
 async def ws_connect_with_cookies(cookies):
     """Connect to WebSocket with cookies."""
@@ -142,6 +139,7 @@ async def test_websocket_rate_limiter():
         # The number of received messages should be exactly the limit
         # as the server should broadcast back the messages that were not dropped
         from app.main import WS_MAX_MESSAGES
+
         assert (
             received_count == WS_MAX_MESSAGES
         ), f"Expected {WS_MAX_MESSAGES} messages, but received {received_count}"
