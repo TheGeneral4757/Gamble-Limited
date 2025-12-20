@@ -12,9 +12,21 @@ A full-featured, self-hosted casino gaming platform built with Python and FastAP
 
 ## ⚡ Quickstart: Run Locally
 
-From the root of the repository, run the following commands to set up and start the development server:
+This guide will get you up and running with a local development environment in minutes.
+
+**Prerequisites:**
+- Python 3.10+
+- `git` for cloning the repository
+
+### 1. Clone, Set Up & Run
+
+The following commands will clone the repository, run the automated setup script, create a test user, and start the development server.
 
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/RNG-THING.git
+cd RNG-THING
+
 # Run setup script (creates venv, installs deps, generates .env)
 bash scripts/setup_dev.sh
 
@@ -27,6 +39,8 @@ python scripts/create_test_user.py
 # Run the server
 python -m app.main
 ```
+
+### 2. Login
 
 After the server starts, you can **login** at [http://localhost:8000](http://localhost:8000) with:
 -   **Username:** `testuser`
@@ -70,44 +84,6 @@ After the server starts, you can **login** at [http://localhost:8000](http://loc
 - **Starting Balance:** New users start with a configurable amount of both currencies.
 
 ---
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Python 3.10+
-- `pip` for installing dependencies
-- Docker and Docker Compose (for containerized deployment)
-
-### Local Installation (for Development)
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/yourusername/RNG-THING.git
-    cd RNG-THING
-    ```
-
-2.  **Run the development setup script:**
-    This script will create a virtual environment, install dependencies, and set up your `.env` file.
-    ```bash
-    bash scripts/setup_dev.sh
-    ```
-
-3.  **Activate the virtual environment:**
-    ```bash
-    source venv/bin/activate
-    ```
-
-4.  **Create a test user (optional):**
-    This script creates a user with the username `testuser` and password `password`.
-    ```bash
-    python scripts/create_test_user.py
-    ```
-
-5.  **Run the development server:**
-    ```bash
-    python -m app.main
-    ```
-    The server will start at `http://localhost:8000`.
-
 ---
 
 ## 🧪 Testing
