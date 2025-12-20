@@ -116,7 +116,7 @@ def get_user_id(request: Request) -> tuple:
     return int(user_id) if user_id != "0" else 0, is_admin, user_type
 
 
-def validate_bet(
+async def validate_bet(
     user_id: int, bet: float, game: str, is_admin: bool = False, user_type: str = "user"
 ):
     """Validate bet amount and funds."""
@@ -137,7 +137,7 @@ def validate_bet(
     if bet < min_bet or bet > max_bet:
         return {"valid": False, "error": f"Bet must be between {min_bet} and {max_bet}"}
 
-    balance = economy.get_balance(user_id)
+    balance = await economy.get_balance(user_id)
     if balance["credits"] < bet:
         return {"valid": False, "error": "Insufficient credits"}
 
@@ -171,7 +171,7 @@ async def get_balance(request: Request):
     if is_admin and user_type != "house":
         return {"user_id": 0, "cash": 999999, "credits": 999999, "is_admin": True}
 
-    balance = economy.get_balance(user_id)
+    balance = await economy.get_balance(user_id)
     return {"user_id": user_id, **balance, "user_type": user_type}
 
 
@@ -188,7 +188,7 @@ async def exchange_currency(request: Request, data: ExchangeRequest):
             "balance": {"cash": 999999, "credits": 999999},
         }
 
-    result = economy.do_exchange(user_id, data.from_currency, data.amount)
+    result = await economy.do_exchange(user_id, data.from_currency, data.amount)
 
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -203,7 +203,7 @@ async def get_transactions(request: Request):
     if is_admin and user_type != "house":
         return {"transactions": []}
 
-    transactions = db.get_transactions(user_id)
+    transactions = await db.get_transactions(user_id)
     return {"transactions": transactions}
 
 
@@ -219,7 +219,7 @@ async def claim_daily_bonus(request: Request):
             "message": "Admin doesn't need daily bonus",
         }
 
-    result = db.claim_daily_bonus(user_id)
+    result = await db.claim_daily_bonus(user_id)
 
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -240,7 +240,7 @@ async def claim_daily_cash(request: Request):
             "message": "Admin doesn't need daily cash",
         }
 
-    result = db.claim_daily_cash(user_id)
+    result = await db.claim_daily_cash(user_id)
 
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -255,7 +255,7 @@ async def claim_daily_cash(request: Request):
 @router.get("/leaderboard")
 async def get_leaderboard():
     """Get public leaderboard data."""
-    leaderboard = db.get_leaderboard(limit=10)
+    leaderboard = await db.get_leaderboard(limit=10)
     return {"leaderboard": leaderboard}
 
 
@@ -268,28 +268,28 @@ async def slots_spin(request: Request, data: BetRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
 
-    validation = validate_bet(user_id, data.bet, "slots", is_admin, user_type)
+    validation = await validate_bet(user_id, data.bet, "slots", is_admin, user_type)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail=validation["error"])
 
     # Deduct bet (skip only for true admin, not house)
     if not is_true_admin:
-        economy.place_bet(user_id, data.bet, "slots")
+        await economy.place_bet(user_id, data.bet, "slots")
         # House takes a cut of every bet
-        db.add_house_cut(data.bet, "slots")
+        await db.add_house_cut(data.bet, "slots")
 
     result = slots_game.spin(data.bet)
 
     # Add winnings
     if result["payout"] > 0 and not is_true_admin:
-        economy.add_winnings(user_id, result["payout"], "slots", data.bet)
+        await economy.add_winnings(user_id, result["payout"], "slots", data.bet)
     elif not is_true_admin:
-        db.record_game(user_id, "slots", data.bet, 0)
+        await db.record_game(user_id, "slots", data.bet, 0)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
 
     return {**result, "balance": balance}
@@ -304,26 +304,26 @@ async def blackjack_deal(request: Request, data: BlackjackActionRequest):
     if not data.bet:
         raise HTTPException(status_code=400, detail="Bet amount required")
 
-    validation = validate_bet(user_id, data.bet, "blackjack", is_admin, user_type)
+    validation = await validate_bet(user_id, data.bet, "blackjack", is_admin, user_type)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail=validation["error"])
 
     if not is_true_admin:
-        economy.place_bet(user_id, data.bet, "blackjack")
-        db.add_house_cut(data.bet, "blackjack")
+        await economy.place_bet(user_id, data.bet, "blackjack")
+        await db.add_house_cut(data.bet, "blackjack")
 
     result = blackjack_game.deal(data.bet, user_id)
 
     if result.get("status") == "complete":
         if result["payout"] > 0 and not is_true_admin:
-            economy.add_winnings(user_id, result["payout"], "blackjack", data.bet)
+            await economy.add_winnings(user_id, result["payout"], "blackjack", data.bet)
         elif not is_true_admin:
-            db.record_game(user_id, "blackjack", data.bet, result["payout"])
+            await db.record_game(user_id, "blackjack", data.bet, result["payout"])
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -344,16 +344,16 @@ async def blackjack_hit(request: Request, data: BlackjackActionRequest):
 
     if result.get("status") == "complete" and not is_true_admin:
         if result["payout"] > 0:
-            economy.add_winnings(
+            await economy.add_winnings(
                 user_id, result["payout"], "blackjack", result.get("bet", 0)
             )
         else:
-            db.record_game(user_id, "blackjack", result.get("bet", 0), 0)
+            await db.record_game(user_id, "blackjack", result.get("bet", 0), 0)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -374,16 +374,16 @@ async def blackjack_stand(request: Request, data: BlackjackActionRequest):
 
     if not is_true_admin:
         if result["payout"] > 0:
-            economy.add_winnings(
+            await economy.add_winnings(
                 user_id, result["payout"], "blackjack", result.get("bet", 0)
             )
         else:
-            db.record_game(user_id, "blackjack", result.get("bet", 0), 0)
+            await db.record_game(user_id, "blackjack", result.get("bet", 0), 0)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -394,25 +394,25 @@ async def roulette_spin(request: Request, data: RouletteRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
 
-    validation = validate_bet(user_id, data.bet, "roulette", is_admin, user_type)
+    validation = await validate_bet(user_id, data.bet, "roulette", is_admin, user_type)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail=validation["error"])
 
     if not is_true_admin:
-        economy.place_bet(user_id, data.bet, "roulette")
-        db.add_house_cut(data.bet, "roulette")
+        await economy.place_bet(user_id, data.bet, "roulette")
+        await db.add_house_cut(data.bet, "roulette")
 
     result = roulette_game.spin(data.bet, data.bet_type, data.bet_value)
 
     if result["payout"] > 0 and not is_true_admin:
-        economy.add_winnings(user_id, result["payout"], "roulette", data.bet)
+        await economy.add_winnings(user_id, result["payout"], "roulette", data.bet)
     elif not is_true_admin:
-        db.record_game(user_id, "roulette", data.bet, 0)
+        await db.record_game(user_id, "roulette", data.bet, 0)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -423,25 +423,25 @@ async def plinko_drop(request: Request, data: PlinkoRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
 
-    validation = validate_bet(user_id, data.bet, "plinko", is_admin, user_type)
+    validation = await validate_bet(user_id, data.bet, "plinko", is_admin, user_type)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail=validation["error"])
 
     if not is_true_admin:
-        economy.place_bet(user_id, data.bet, "plinko")
-        db.add_house_cut(data.bet, "plinko")
+        await economy.place_bet(user_id, data.bet, "plinko")
+        await db.add_house_cut(data.bet, "plinko")
 
     result = plinko_game.drop(data.bet, data.rows)
 
     if result["payout"] > 0 and not is_true_admin:
-        economy.add_winnings(user_id, result["payout"], "plinko", data.bet)
+        await economy.add_winnings(user_id, result["payout"], "plinko", data.bet)
     elif not is_true_admin:
-        db.record_game(user_id, "plinko", data.bet, 0)
+        await db.record_game(user_id, "plinko", data.bet, 0)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -452,25 +452,25 @@ async def coinflip_flip(request: Request, data: CoinflipRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
 
-    validation = validate_bet(user_id, data.bet, "coinflip", is_admin, user_type)
+    validation = await validate_bet(user_id, data.bet, "coinflip", is_admin, user_type)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail=validation["error"])
 
     if not is_true_admin:
-        economy.place_bet(user_id, data.bet, "coinflip")
-        db.add_house_cut(data.bet, "coinflip")
+        await economy.place_bet(user_id, data.bet, "coinflip")
+        await db.add_house_cut(data.bet, "coinflip")
 
     result = coinflip_game.flip(data.bet, data.choice)
 
     if result["payout"] > 0 and not is_true_admin:
-        economy.add_winnings(user_id, result["payout"], "coinflip", data.bet)
+        await economy.add_winnings(user_id, result["payout"], "coinflip", data.bet)
     elif not is_true_admin:
-        db.record_game(user_id, "coinflip", data.bet, 0)
+        await db.record_game(user_id, "coinflip", data.bet, 0)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -484,25 +484,25 @@ async def scratch_cards_buy(request: Request, data: BetRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
 
-    validation = validate_bet(user_id, data.bet, "scratch_cards", is_admin, user_type)
+    validation = await validate_bet(user_id, data.bet, "scratch_cards", is_admin, user_type)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail=validation["error"])
 
     if not is_true_admin:
-        economy.place_bet(user_id, data.bet, "scratch_cards")
-        db.add_house_cut(data.bet, "scratch_cards")
+        await economy.place_bet(user_id, data.bet, "scratch_cards")
+        await db.add_house_cut(data.bet, "scratch_cards")
 
     result = scratch_cards_game.buy(data.bet)
 
     if result["payout"] > 0 and not is_true_admin:
-        economy.add_winnings(user_id, result["payout"], "scratch_cards", data.bet)
+        await economy.add_winnings(user_id, result["payout"], "scratch_cards", data.bet)
     elif not is_true_admin:
-        db.record_game(user_id, "scratch_cards", data.bet, 0)
+        await db.record_game(user_id, "scratch_cards", data.bet, 0)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -513,20 +513,20 @@ async def highlow_start(request: Request, data: BetRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
 
-    validation = validate_bet(user_id, data.bet, "highlow", is_admin, user_type)
+    validation = await validate_bet(user_id, data.bet, "highlow", is_admin, user_type)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail=validation["error"])
 
     if not is_true_admin:
-        economy.place_bet(user_id, data.bet, "highlow")
-        db.add_house_cut(data.bet, "highlow")
+        await economy.place_bet(user_id, data.bet, "highlow")
+        await db.add_house_cut(data.bet, "highlow")
 
     result = highlow_game.start(data.bet, user_id)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -545,7 +545,7 @@ async def highlow_guess(request: Request, data: HighLowGuessRequest):
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -563,12 +563,12 @@ async def highlow_cashout(request: Request, data: HighLowCashoutRequest):
 
     # Add winnings on successful cashout
     if result.get("payout", 0) > 0 and not is_true_admin:
-        economy.add_winnings(user_id, result["payout"], "highlow", result.get("bet", 0))
+        await economy.add_winnings(user_id, result["payout"], "highlow", result.get("bet", 0))
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -579,13 +579,13 @@ async def dice_roll(request: Request, data: DiceRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
 
-    validation = validate_bet(user_id, data.bet, "dice", is_admin, user_type)
+    validation = await validate_bet(user_id, data.bet, "dice", is_admin, user_type)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail=validation["error"])
 
     if not is_true_admin:
-        economy.place_bet(user_id, data.bet, "dice")
-        db.add_house_cut(data.bet, "dice")
+        await economy.place_bet(user_id, data.bet, "dice")
+        await db.add_house_cut(data.bet, "dice")
 
     result = dice_game.roll(data.bet, data.bet_type, data.bet_value)
 
@@ -593,14 +593,14 @@ async def dice_roll(request: Request, data: DiceRequest):
         raise HTTPException(status_code=400, detail=result["error"])
 
     if result["payout"] > 0 and not is_true_admin:
-        economy.add_winnings(user_id, result["payout"], "dice", data.bet)
+        await economy.add_winnings(user_id, result["payout"], "dice", data.bet)
     elif not is_true_admin:
-        db.record_game(user_id, "dice", data.bet, 0)
+        await db.record_game(user_id, "dice", data.bet, 0)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -611,13 +611,13 @@ async def number_guess(request: Request, data: NumberGuessRequest):
     user_id, is_admin, user_type = get_user_id(request)
     is_true_admin = is_admin and user_type != "house"
 
-    validation = validate_bet(user_id, data.bet, "number_guess", is_admin, user_type)
+    validation = await validate_bet(user_id, data.bet, "number_guess", is_admin, user_type)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail=validation["error"])
 
     if not is_true_admin:
-        economy.place_bet(user_id, data.bet, "number_guess")
-        db.add_house_cut(data.bet, "number_guess")
+        await economy.place_bet(user_id, data.bet, "number_guess")
+        await db.add_house_cut(data.bet, "number_guess")
 
     result = number_guess_game.guess(data.bet, data.guess)
 
@@ -625,14 +625,14 @@ async def number_guess(request: Request, data: NumberGuessRequest):
         raise HTTPException(status_code=400, detail=result["error"])
 
     if result["payout"] > 0 and not is_true_admin:
-        economy.add_winnings(user_id, result["payout"], "number_guess", data.bet)
+        await economy.add_winnings(user_id, result["payout"], "number_guess", data.bet)
     elif not is_true_admin:
-        db.record_game(user_id, "number_guess", data.bet, 0)
+        await db.record_game(user_id, "number_guess", data.bet, 0)
 
     balance = (
         {"cash": 999999, "credits": 999999}
         if is_true_admin
-        else economy.get_balance(user_id)
+        else await economy.get_balance(user_id)
     )
     return {**result, "balance": balance}
 
@@ -642,8 +642,9 @@ async def number_guess(request: Request, data: NumberGuessRequest):
 
 @router.get("/games/lottery/info")
 async def lottery_info():
-    jackpot = db.get_lottery_jackpot()["current_amount"]
-    no_winner_months = db.get_lottery_jackpot()["no_winner_months"]
+    jackpot_info = await db.get_lottery_jackpot()
+    jackpot = jackpot_info["current_amount"]
+    no_winner_months = jackpot_info["no_winner_months"]
     return lottery_system.get_lottery_info(jackpot, no_winner_months)
 
 
@@ -653,12 +654,12 @@ async def lottery_tickets(request: Request):
     if not user_id:
         return []
     draw_id = lottery_system.get_current_draw_id()
-    return db.get_user_lottery_tickets(user_id, draw_id)
+    return await db.get_user_lottery_tickets(user_id, draw_id)
 
 
 @router.get("/games/lottery/history")
 async def lottery_history():
-    return db.get_lottery_history()
+    return await db.get_lottery_history()
 
 
 @router.post("/games/lottery/buy")
@@ -677,7 +678,7 @@ async def lottery_buy(request: Request, data: LotteryBuyRequest):
 
     # Check ticket limit
     draw_id = lottery_system.get_current_draw_id()
-    count = db.get_user_ticket_count(user_id, draw_id)
+    count = await db.get_user_ticket_count(user_id, draw_id)
     limit = lottery_system.get_max_tickets()
     if count >= limit:
         raise HTTPException(
@@ -686,13 +687,13 @@ async def lottery_buy(request: Request, data: LotteryBuyRequest):
 
     # Pay for ticket (CASH, not credits)
     price = lottery_system.get_ticket_price()
-    balance = economy.get_balance(user_id)
+    balance = await economy.get_balance(user_id)
     if balance["cash"] < price:
         raise HTTPException(400, "Insufficient cash balance")
 
     # Deduct cash
-    db.update_balance(user_id, cash_delta=-price)
-    db.log_transaction(
+    await db.update_balance(user_id, cash_delta=-price)
+    await db.log_transaction(
         user_id,
         "lottery_buy",
         -price,
@@ -703,10 +704,10 @@ async def lottery_buy(request: Request, data: LotteryBuyRequest):
 
     # Add to jackpot (Contribution logic)
     contribution = price * 0.40
-    db.update_lottery_jackpot(delta=contribution)
+    await db.update_lottery_jackpot(delta=contribution)
 
     # Issue ticket
-    ticket = db.buy_lottery_ticket(user_id, data.numbers, draw_id)
+    ticket = await db.buy_lottery_ticket(user_id, data.numbers, draw_id)
 
     return ticket
 
@@ -714,14 +715,14 @@ async def lottery_buy(request: Request, data: LotteryBuyRequest):
 @router.get("/games/lottery/coinflip/status")
 async def lottery_coinflip_status(request: Request):
     user_id, _, _ = get_user_id(request)
-    status = db.get_coin_flip_status(user_id)
+    status = await db.get_coin_flip_status(user_id)
     return status or {"status": "none"}
 
 
 @router.post("/games/lottery/coinflip/respond")
 async def lottery_coinflip_respond(request: Request, data: CoinFlipResponseRequest):
     user_id, _, _ = get_user_id(request)
-    result = db.respond_to_coin_flip(data.request_id, user_id, data.agreed)
+    result = await db.respond_to_coin_flip(data.request_id, user_id, data.agreed)
     return result
 
 
