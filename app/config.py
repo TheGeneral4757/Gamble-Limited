@@ -299,14 +299,19 @@ def load_config() -> AppConfig:
 
     config = AppConfig(**data)
 
-    # Security validation: Ensure default secret key is not used in production
-    if (
-        not config.server.debug
-        and config.security.secret_key == "CHANGE_THIS_IN_PRODUCTION_PLEASE"
-    ):
+    # Security validation: Ensure a secure secret key is ALWAYS set.
+    default_key = "CHANGE_THIS_IN_PRODUCTION_PLEASE"
+    if config.security.secret_key == default_key:
         raise ValueError(
-            "CRITICAL: Default secret_key is in use in a non-debug environment. "
-            "Please set a unique, secure SECRET_KEY in your .env file or config.json."
+            "CRITICAL: Default 'secret_key' is in use, which is insecure. "
+            "Please generate a secure, random key of at least 32 characters and set it as "
+            "the SECRET_KEY in your .env file. You can generate one with: "
+            "python -c 'import secrets; print(secrets.token_hex(32))'"
+        )
+    if len(config.security.secret_key) < 32:
+        raise ValueError(
+            "CRITICAL: The configured 'secret_key' is too short (must be at least 32 characters). "
+            "A short key is insecure. Please set a longer, secure SECRET_KEY in your .env file."
         )
 
     return config
