@@ -274,8 +274,7 @@ class Database:
             )
 
     # ==================== User Authentication ====================
-
-    async def create_user(self, username: str, password: str = None) -> Dict:
+    def _sync_create_user(self, username: str, password: str = None) -> Dict:
         """Create a new user with username and optional password."""
         import bcrypt
 
@@ -296,9 +295,7 @@ class Database:
         password_hash = None
         if password:
             # Loadout: Move blocking bcrypt call to a thread to avoid blocking the event loop.
-            password_hash = await asyncio.to_thread(
-                bcrypt.hashpw, password.encode("utf-8"), bcrypt.gensalt()
-            )
+            password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
             password_hash = password_hash.decode("utf-8")
 
         cursor.execute(
@@ -326,6 +323,11 @@ class Database:
             "credits": settings.economy.starting_credits,
         }
 
+    async def create_user(self, username: str, password: str = None) -> Dict:
+        """Create a new user with username and optional password."""
+        return await asyncio.to_thread(self._sync_create_user, username, password)
+
+
     def _sanitize_username(self, username: str) -> str:
         """Sanitize username - alphanumeric only, 3-20 chars."""
         import re
@@ -338,7 +340,7 @@ class Database:
             return ""
         return username
 
-    async def login_user(self, username: str, password: str = None) -> Optional[Dict]:
+    def _sync_login_user(self, username: str, password: str = None) -> Optional[Dict]:
         """Login existing user by username and password."""
         import bcrypt
 
@@ -359,8 +361,7 @@ class Database:
                 return None  # Password required but not provided
             try:
                 # Loadout: Move blocking bcrypt call to a thread.
-                is_valid = await asyncio.to_thread(
-                    bcrypt.checkpw,
+                is_valid = bcrypt.checkpw(
                     password.encode("utf-8"),
                     user["password_hash"].encode("utf-8"),
                 )
@@ -392,7 +393,11 @@ class Database:
 
         return user
 
-    def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+    async def login_user(self, username: str, password: str = None) -> Optional[Dict]:
+        """Login existing user by username and password."""
+        return await asyncio.to_thread(self._sync_login_user, username, password)
+
+    def _sync_get_user_by_id(self, user_id: int) -> Optional[Dict]:
         """Get user by ID."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -401,16 +406,25 @@ class Database:
         row = cursor.fetchone()
         return dict(row) if row else None
 
-    def username_exists(self, username: str) -> bool:
+    async def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """Get user by ID."""
+        return await asyncio.to_thread(self._sync_get_user_by_id, user_id)
+
+
+    def _sync_username_exists(self, username: str) -> bool:
         """Check if username exists."""
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
         return cursor.fetchone() is not None
 
+    async def username_exists(self, username: str) -> bool:
+        """Check if username exists."""
+        return await asyncio.to_thread(self._sync_username_exists, username)
+
     # ==================== Admin Authentication ====================
 
-    async def verify_admin_password(self, password: str) -> bool:
+    def _sync_verify_admin_password(self, password: str) -> bool:
         """Verify admin password using bcrypt against config.json."""
         import bcrypt
         from app.config import settings
@@ -421,8 +435,7 @@ class Database:
         if stored_hash.startswith("$2"):
             try:
                 # Loadout: Move blocking bcrypt call to a thread.
-                return await asyncio.to_thread(
-                    bcrypt.checkpw,
+                return bcrypt.checkpw(
                     password.encode("utf-8"),
                     stored_hash.encode("utf-8"),
                 )
@@ -432,7 +445,11 @@ class Database:
             # Plain text comparison (shouldn't happen after first run)
             return password == stored_hash
 
-    def set_admin_password(self, new_password: str):
+    async def verify_admin_password(self, password: str) -> bool:
+        """Verify admin password using bcrypt against config.json."""
+        return await asyncio.to_thread(self._sync_verify_admin_password, password)
+
+    def _sync_set_admin_password(self, new_password: str):
         """Set new admin password in config.json."""
         import bcrypt
         import json
@@ -456,16 +473,24 @@ class Database:
 
         reload(app.config)
 
+    async def set_admin_password(self, new_password: str):
+        """Set new admin password in config.json."""
+        return await asyncio.to_thread(self._sync_set_admin_password, new_password)
+
     # ==================== Balance Operations ====================
 
-    def get_balance(self, user_id: int) -> Dict:
+    def _sync_get_balance(self, user_id: int) -> Dict:
         """Get user's current balance."""
-        user = self.get_user_by_id(user_id)
+        user = self._sync_get_user_by_id(user_id)
         if not user:
             return {"cash": 0, "credits": 0}
         return {"cash": user["cash"], "credits": user["credits"]}
 
-    def update_balance(
+    async def get_balance(self, user_id: int) -> Dict:
+        """Get user's current balance."""
+        return await asyncio.to_thread(self._sync_get_balance, user_id)
+
+    def _sync_update_balance(
         self, user_id: int, cash_delta: float = 0, credits_delta: float = 0
     ) -> Dict:
         """Update user balance by delta amounts."""
@@ -482,16 +507,22 @@ class Database:
         )
         conn.commit()
 
-        return self.get_balance(user_id)
+        return self._sync_get_balance(user_id)
 
-    def set_balance(
+    async def update_balance(
+        self, user_id: int, cash_delta: float = 0, credits_delta: float = 0
+    ) -> Dict:
+        """Update user balance by delta amounts."""
+        return await asyncio.to_thread(self._sync_update_balance, user_id, cash_delta, credits_delta)
+
+    def _sync_set_balance(
         self, user_id: int, cash: float = None, credits: float = None
     ) -> Dict:
         """Set user balance to specific values."""
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        current = self.get_balance(user_id)
+        current = self._sync_get_balance(user_id)
         new_cash = cash if cash is not None else current["cash"]
         new_credits = credits if credits is not None else current["credits"]
 
@@ -503,11 +534,17 @@ class Database:
         )
         conn.commit()
 
-        return self.get_balance(user_id)
+        return self._sync_get_balance(user_id)
+
+    async def set_balance(
+        self, user_id: int, cash: float = None, credits: float = None
+    ) -> Dict:
+        """Set user balance to specific values."""
+        return await asyncio.to_thread(self._sync_set_balance, user_id, cash, credits)
 
     # ==================== Daily Bonus ====================
 
-    def _claim_daily_reward(
+    def _sync_claim_daily_reward(
         self,
         user_id: int,
         currency: str,
@@ -534,7 +571,7 @@ class Database:
         conn.commit()
 
         if cursor.rowcount == 0:
-            user = self.get_user_by_id(user_id)
+            user = self._sync_get_user_by_id(user_id)
             if user:
                 return {
                     "success": False,
@@ -586,7 +623,7 @@ class Database:
             )
             conn.commit()
 
-            self.log_transaction(
+            self._sync_log_transaction(
                 user_id,
                 f"daily_{currency}",
                 bonus_amount_setting,
@@ -612,13 +649,13 @@ class Database:
             )
             conn.commit()
 
-    def claim_daily_bonus(self, user_id: int) -> Dict:
+    def _sync_claim_daily_bonus(self, user_id: int) -> Dict:
         """
         Claim daily bonus credits. Returns success/error with details.
         Cooldown and amount are configurable in config.json.
         This function is protected against race conditions.
         """
-        return self._claim_daily_reward(
+        return self._sync_claim_daily_reward(
             user_id,
             currency="credits",
             last_claim_col="last_daily_claim",
@@ -627,12 +664,20 @@ class Database:
             bonus_amount_setting=settings.economy.daily_bonus_amount,
         )
 
-    def claim_daily_cash(self, user_id: int) -> Dict:
+    async def claim_daily_bonus(self, user_id: int) -> Dict:
+        """
+        Claim daily bonus credits. Returns success/error with details.
+        Cooldown and amount are configurable in config.json.
+        This function is protected against race conditions.
+        """
+        return await asyncio.to_thread(self._sync_claim_daily_bonus, user_id)
+
+    def _sync_claim_daily_cash(self, user_id: int) -> Dict:
         """
         Claim daily cash bonus. Separate from credits daily bonus.
         This function is protected against race conditions.
         """
-        return self._claim_daily_reward(
+        return self._sync_claim_daily_reward(
             user_id,
             currency="cash",
             last_claim_col="last_daily_cash",
@@ -641,9 +686,16 @@ class Database:
             bonus_amount_setting=settings.economy.daily_cash_amount,
         )
 
+    async def claim_daily_cash(self, user_id: int) -> Dict:
+        """
+        Claim daily cash bonus. Separate from credits daily bonus.
+        This function is protected against race conditions.
+        """
+        return await asyncio.to_thread(self._sync_claim_daily_cash, user_id)
+
     # ==================== House Balance ====================
 
-    def add_house_cut(self, bet_amount: float, game: str = None) -> float:
+    def _sync_add_house_cut(self, bet_amount: float, game: str = None) -> float:
         """
         Add house cut from a bet to THE HOUSE user's balance.
         Returns the cut amount.
@@ -669,7 +721,7 @@ class Database:
         cursor.execute("SELECT id, credits FROM users WHERE username = 'THE_HOUSE'")
         house = cursor.fetchone()
         if house:
-            self.log_transaction(
+            self._sync_log_transaction(
                 house["id"],
                 "house_cut",
                 cut_amount,
@@ -680,7 +732,14 @@ class Database:
 
         return cut_amount
 
-    def get_house_balance(self) -> Dict:
+    async def add_house_cut(self, bet_amount: float, game: str = None) -> float:
+        """
+        Add house cut from a bet to THE HOUSE user's balance.
+        Returns the cut amount.
+        """
+        return await asyncio.to_thread(self._sync_add_house_cut, bet_amount, game)
+
+    def _sync_get_house_balance(self) -> Dict:
         """Get THE HOUSE balance."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -692,7 +751,11 @@ class Database:
             return {"cash": row["cash"], "credits": row["credits"]}
         return {"cash": 0, "credits": 0}
 
-    def get_house_user(self) -> Optional[Dict]:
+    async def get_house_balance(self) -> Dict:
+        """Get THE HOUSE balance."""
+        return await asyncio.to_thread(self._sync_get_house_balance)
+
+    def _sync_get_house_user(self) -> Optional[Dict]:
         """Get THE HOUSE user data."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -701,9 +764,13 @@ class Database:
         row = cursor.fetchone()
         return dict(row) if row else None
 
+    async def get_house_user(self) -> Optional[Dict]:
+        """Get THE HOUSE user data."""
+        return await asyncio.to_thread(self._sync_get_house_user)
+
     # ==================== Conversion Tracking ====================
 
-    def record_conversion(self, user_id: int, amount: float):
+    def _sync_record_conversion(self, user_id: int, amount: float):
         """Record a currency conversion for rate adjustment."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -718,7 +785,11 @@ class Database:
         )
         conn.commit()
 
-    def get_conversion_penalty(self, user_id: int) -> float:
+    async def record_conversion(self, user_id: int, amount: float):
+        """Record a currency conversion for rate adjustment."""
+        return await asyncio.to_thread(self._sync_record_conversion, user_id, amount)
+
+    def _sync_get_conversion_penalty(self, user_id: int) -> float:
         """Get rate penalty based on recent conversions (0-15% penalty)."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -755,9 +826,13 @@ class Database:
         except Exception:
             return 0.0
 
+    async def get_conversion_penalty(self, user_id: int) -> float:
+        """Get rate penalty based on recent conversions (0-15% penalty)."""
+        return await asyncio.to_thread(self._sync_get_conversion_penalty, user_id)
+
     # ==================== Game Stats ====================
 
-    def record_game(self, user_id: int, game: str, bet: float, payout: float):
+    def _sync_record_game(self, user_id: int, game: str, bet: float, payout: float):
         """Record a game play."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -814,7 +889,11 @@ class Database:
 
         conn.commit()
 
-    def log_transaction(
+    async def record_game(self, user_id: int, game: str, bet: float, payout: float):
+        """Record a game play."""
+        return await asyncio.to_thread(self._sync_record_game, user_id, game, bet, payout)
+
+    def _sync_log_transaction(
         self,
         user_id: int,
         tx_type: str,
@@ -837,7 +916,20 @@ class Database:
         )
         conn.commit()
 
-    def get_transactions(self, user_id: int, limit: int = 50) -> List[Dict]:
+    async def log_transaction(
+        self,
+        user_id: int,
+        tx_type: str,
+        amount: float,
+        balance_after: float,
+        game: str = None,
+        currency: str = "credits",
+        details: str = None,
+    ):
+        """Log a transaction."""
+        return await asyncio.to_thread(self._sync_log_transaction, user_id, tx_type, amount, balance_after, game, currency, details)
+
+    def _sync_get_transactions(self, user_id: int, limit: int = 50) -> List[Dict]:
         """Get recent transactions."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -852,9 +944,13 @@ class Database:
 
         return [dict(row) for row in cursor.fetchall()]
 
+    async def get_transactions(self, user_id: int, limit: int = 50) -> List[Dict]:
+        """Get recent transactions."""
+        return await asyncio.to_thread(self._sync_get_transactions, user_id, limit)
+
     # ==================== Admin Functions ====================
 
-    def get_all_users(self, limit: int = 100) -> List[Dict]:
+    def _sync_get_all_users(self, limit: int = 100) -> List[Dict]:
         """Get all users."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -867,7 +963,11 @@ class Database:
         )
         return [dict(row) for row in cursor.fetchall()]
 
-    def reset_user(self, user_id: int) -> Dict:
+    async def get_all_users(self, limit: int = 100) -> List[Dict]:
+        """Get all users."""
+        return await asyncio.to_thread(self._sync_get_all_users, limit)
+
+    def _sync_reset_user(self, user_id: int) -> Dict:
         """Reset user to default balance."""
         from app.config import settings
 
@@ -896,13 +996,17 @@ class Database:
         conn.commit()
         return {"success": True, "user_id": user_id}
 
-    def delete_user(self, user_id: int) -> Dict:
+    async def reset_user(self, user_id: int) -> Dict:
+        """Reset user to default balance."""
+        return await asyncio.to_thread(self._sync_reset_user, user_id)
+
+    async def delete_user(self, user_id: int) -> Dict:
         """Delete a user completely - DEPRECATED, use ban_user instead."""
-        return self.ban_user(
+        return await self.ban_user(
             user_id, hours=8760, reason="Account deleted"
         )  # 1 year ban
 
-    def ban_user(
+    def _sync_ban_user(
         self, user_id: int, hours: int = 24, reason: str = "Banned by admin"
     ) -> Dict:
         """Ban a user for a specified duration."""
@@ -922,7 +1026,13 @@ class Database:
         logger.info(f"User {user_id} banned until {banned_until}: {reason}")
         return {"success": True, "banned_until": banned_until, "reason": reason}
 
-    def unban_user(self, user_id: int) -> Dict:
+    async def ban_user(
+        self, user_id: int, hours: int = 24, reason: str = "Banned by admin"
+    ) -> Dict:
+        """Ban a user for a specified duration."""
+        return await asyncio.to_thread(self._sync_ban_user, user_id, hours, reason)
+
+    def _sync_unban_user(self, user_id: int) -> Dict:
         """Remove ban from a user."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -936,7 +1046,11 @@ class Database:
         logger.info(f"User {user_id} unbanned")
         return {"success": True}
 
-    def get_stats(self) -> Dict:
+    async def unban_user(self, user_id: int) -> Dict:
+        """Remove ban from a user."""
+        return await asyncio.to_thread(self._sync_unban_user, user_id)
+
+    def _sync_get_stats(self) -> Dict:
         """Get platform statistics."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -959,7 +1073,11 @@ class Database:
 
         return {"users": user_stats, "transactions": tx_stats}
 
-    def clear_all_data(self):
+    async def get_stats(self) -> Dict:
+        """Get platform statistics."""
+        return await asyncio.to_thread(self._sync_get_stats)
+
+    def _sync_clear_all_data(self):
         """Clear all non-admin data."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -971,7 +1089,11 @@ class Database:
 
         return {"status": "cleared"}
 
-    def get_leaderboard(self, limit: int = 10) -> List[Dict]:
+    async def clear_all_data(self):
+        """Clear all non-admin data."""
+        return await asyncio.to_thread(self._sync_clear_all_data)
+
+    def _sync_get_leaderboard(self, limit: int = 10) -> List[Dict]:
         """Get top players by various metrics."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -988,7 +1110,11 @@ class Database:
 
         return [dict(row) for row in cursor.fetchall()]
 
-    def get_game_breakdown(self) -> List[Dict]:
+    async def get_leaderboard(self, limit: int = 10) -> List[Dict]:
+        """Get top players by various metrics."""
+        return await asyncio.to_thread(self._sync_get_leaderboard, limit)
+
+    def _sync_get_game_breakdown(self) -> List[Dict]:
         """Get statistics per game."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1009,7 +1135,11 @@ class Database:
 
         return [dict(row) for row in cursor.fetchall()]
 
-    def get_user_game_stats(self, user_id: int) -> List[Dict]:
+    async def get_game_breakdown(self) -> List[Dict]:
+        """Get statistics per game."""
+        return await asyncio.to_thread(self._sync_get_game_breakdown)
+
+    def _sync_get_user_game_stats(self, user_id: int) -> List[Dict]:
         """Get game stats for a specific user."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1025,9 +1155,13 @@ class Database:
 
         return [dict(row) for row in cursor.fetchall()]
 
+    async def get_user_game_stats(self, user_id: int) -> List[Dict]:
+        """Get game stats for a specific user."""
+        return await asyncio.to_thread(self._sync_get_user_game_stats, user_id)
+
     # ==================== Lottery Functions ====================
 
-    def get_lottery_jackpot(self) -> Dict:
+    def _sync_get_lottery_jackpot(self) -> Dict:
         """Get current lottery jackpot info."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1043,14 +1177,18 @@ class Database:
             }
         return {"current_amount": 10000.0, "no_winner_months": 0, "last_updated": None}
 
-    def update_lottery_jackpot(
+    async def get_lottery_jackpot(self) -> Dict:
+        """Get current lottery jackpot info."""
+        return await asyncio.to_thread(self._sync_get_lottery_jackpot)
+
+    def _sync_update_lottery_jackpot(
         self, amount: float = None, delta: float = None, no_winner_months: int = None
     ) -> Dict:
         """Update lottery jackpot amount."""
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        current = self.get_lottery_jackpot()
+        current = self._sync_get_lottery_jackpot()
 
         if delta is not None:
             new_amount = current["current_amount"] + delta
@@ -1075,9 +1213,15 @@ class Database:
         )
         conn.commit()
 
-        return self.get_lottery_jackpot()
+        return self._sync_get_lottery_jackpot()
 
-    def buy_lottery_ticket(
+    async def update_lottery_jackpot(
+        self, amount: float = None, delta: float = None, no_winner_months: int = None
+    ) -> Dict:
+        """Update lottery jackpot amount."""
+        return await asyncio.to_thread(self._sync_update_lottery_jackpot, amount, delta, no_winner_months)
+
+    def _sync_buy_lottery_ticket(
         self, user_id: int, numbers: List[int], draw_id: str
     ) -> Dict:
         """
@@ -1121,7 +1265,23 @@ class Database:
             "draw_id": draw_id,
         }
 
-    def get_user_lottery_tickets(self, user_id: int, draw_id: str = None) -> List[Dict]:
+    async def buy_lottery_ticket(
+        self, user_id: int, numbers: List[int], draw_id: str
+    ) -> Dict:
+        """
+        Purchase a lottery ticket.
+
+        Args:
+            user_id: User buying the ticket
+            numbers: List of chosen numbers (as JSON)
+            draw_id: Draw identifier (YYYY-MM format)
+
+        Returns:
+            Dict with success status and ticket info
+        """
+        return await asyncio.to_thread(self._sync_buy_lottery_ticket, user_id, numbers, draw_id)
+
+    def _sync_get_user_lottery_tickets(self, user_id: int, draw_id: str = None) -> List[Dict]:
         """Get user's lottery tickets, optionally filtered by draw."""
         import json
 
@@ -1153,7 +1313,11 @@ class Database:
 
         return tickets
 
-    def get_user_ticket_count(self, user_id: int, draw_id: str) -> int:
+    async def get_user_lottery_tickets(self, user_id: int, draw_id: str = None) -> List[Dict]:
+        """Get user's lottery tickets, optionally filtered by draw."""
+        return await asyncio.to_thread(self._sync_get_user_lottery_tickets, user_id, draw_id)
+
+    def _sync_get_user_ticket_count(self, user_id: int, draw_id: str) -> int:
         """Get number of tickets a user has for a specific draw."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1168,7 +1332,11 @@ class Database:
 
         return cursor.fetchone()["count"]
 
-    def get_all_tickets_for_draw(self, draw_id: str) -> List[Dict]:
+    async def get_user_ticket_count(self, user_id: int, draw_id: str) -> int:
+        """Get number of tickets a user has for a specific draw."""
+        return await asyncio.to_thread(self._sync_get_user_ticket_count, user_id, draw_id)
+
+    def _sync_get_all_tickets_for_draw(self, draw_id: str) -> List[Dict]:
         """Get all tickets for a specific draw."""
         import json
 
@@ -1193,12 +1361,16 @@ class Database:
 
         return tickets
 
-    def create_lottery_draw(self, draw_id: str) -> Dict:
+    async def get_all_tickets_for_draw(self, draw_id: str) -> List[Dict]:
+        """Get all tickets for a specific draw."""
+        return await asyncio.to_thread(self._sync_get_all_tickets_for_draw, draw_id)
+
+    def _sync_create_lottery_draw(self, draw_id: str) -> Dict:
         """Create a new lottery draw record."""
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        jackpot = self.get_lottery_jackpot()
+        jackpot = self._sync_get_lottery_jackpot()
 
         cursor.execute(
             """
@@ -1211,7 +1383,11 @@ class Database:
 
         return {"draw_id": draw_id, "jackpot": jackpot["current_amount"]}
 
-    def record_lottery_draw(
+    async def create_lottery_draw(self, draw_id: str) -> Dict:
+        """Create a new lottery draw record."""
+        return await asyncio.to_thread(self._sync_create_lottery_draw, draw_id)
+
+    def _sync_record_lottery_draw(
         self,
         draw_id: str,
         winning_numbers: List[int],
@@ -1245,7 +1421,18 @@ class Database:
 
         return {"success": True, "draw_id": draw_id}
 
-    def get_lottery_draw(self, draw_id: str) -> Optional[Dict]:
+    async def record_lottery_draw(
+        self,
+        draw_id: str,
+        winning_numbers: List[int],
+        winners: List[Dict],
+        jackpot_amount: float,
+        no_winner_streak: int = 0,
+    ) -> Dict:
+        """Record completed lottery draw results."""
+        return await asyncio.to_thread(self._sync_record_lottery_draw, draw_id, winning_numbers, winners, jackpot_amount, no_winner_streak)
+
+    def _sync_get_lottery_draw(self, draw_id: str) -> Optional[Dict]:
         """Get lottery draw info."""
         import json
 
@@ -1266,7 +1453,11 @@ class Database:
 
         return draw
 
-    def get_lottery_history(self, limit: int = 12) -> List[Dict]:
+    async def get_lottery_draw(self, draw_id: str) -> Optional[Dict]:
+        """Get lottery draw info."""
+        return await asyncio.to_thread(self._sync_get_lottery_draw, draw_id)
+
+    def _sync_get_lottery_history(self, limit: int = 12) -> List[Dict]:
         """Get past lottery draws."""
         import json
 
@@ -1293,7 +1484,11 @@ class Database:
 
         return draws
 
-    def create_lottery_installment(
+    async def get_lottery_history(self, limit: int = 12) -> List[Dict]:
+        """Get past lottery draws."""
+        return await asyncio.to_thread(self._sync_get_lottery_history, limit)
+
+    def _sync_create_lottery_installment(
         self, user_id: int, draw_id: str, total_amount: float, num_payments: int
     ) -> Dict:
         """Create installment payment plan for lottery winner."""
@@ -1337,7 +1532,13 @@ class Database:
             "next_payment_date": next_payment.isoformat(),
         }
 
-    def get_pending_installments(self) -> List[Dict]:
+    async def create_lottery_installment(
+        self, user_id: int, draw_id: str, total_amount: float, num_payments: int
+    ) -> Dict:
+        """Create installment payment plan for lottery winner."""
+        return await asyncio.to_thread(self._sync_create_lottery_installment, user_id, draw_id, total_amount, num_payments)
+
+    def _sync_get_pending_installments(self) -> List[Dict]:
         """Get all installments due for payment."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1356,7 +1557,11 @@ class Database:
 
         return [dict(row) for row in cursor.fetchall()]
 
-    def process_installment_payment(self, installment_id: int) -> Dict:
+    async def get_pending_installments(self) -> List[Dict]:
+        """Get all installments due for payment."""
+        return await asyncio.to_thread(self._sync_get_pending_installments)
+
+    def _sync_process_installment_payment(self, installment_id: int) -> Dict:
         """Process a single installment payment."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1375,7 +1580,7 @@ class Database:
             return {"success": False, "error": "No payments remaining"}
 
         # Pay the user
-        self.update_balance(
+        self._sync_update_balance(
             installment["user_id"], cash_delta=installment["per_payment"]
         )
 
@@ -1405,11 +1610,11 @@ class Database:
         conn.commit()
 
         # Log transaction
-        self.log_transaction(
+        self._sync_log_transaction(
             installment["user_id"],
             "lottery_installment",
             installment["per_payment"],
-            self.get_balance(installment["user_id"])["cash"],
+            self._sync_get_balance(installment["user_id"])["cash"],
             game="lottery",
             currency="cash",
             details=f"Installment payment {installment['payments_remaining'] - new_remaining} of {installment['payments_remaining']}",
@@ -1426,7 +1631,11 @@ class Database:
             "user_id": installment["user_id"],
         }
 
-    def get_user_installments(self, user_id: int) -> List[Dict]:
+    async def process_installment_payment(self, installment_id: int) -> Dict:
+        """Process a single installment payment."""
+        return await asyncio.to_thread(self._sync_process_installment_payment, installment_id)
+
+    def _sync_get_user_installments(self, user_id: int) -> List[Dict]:
         """Get user's lottery installment plans."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1441,7 +1650,11 @@ class Database:
 
         return [dict(row) for row in cursor.fetchall()]
 
-    def create_coin_flip_request(
+    async def get_user_installments(self, user_id: int) -> List[Dict]:
+        """Get user's lottery installment plans."""
+        return await asyncio.to_thread(self._sync_get_user_installments, user_id)
+
+    def _sync_create_coin_flip_request(
         self, draw_id: str, user1_id: int, user2_id: int, hours_to_agree: int = 24
     ) -> Dict:
         """Create a coin flip request for multiple lottery winners."""
@@ -1467,7 +1680,13 @@ class Database:
             "expires_at": expires_at,
         }
 
-    def respond_to_coin_flip(self, request_id: int, user_id: int, agreed: bool) -> Dict:
+    async def create_coin_flip_request(
+        self, draw_id: str, user1_id: int, user2_id: int, hours_to_agree: int = 24
+    ) -> Dict:
+        """Create a coin flip request for multiple lottery winners."""
+        return await asyncio.to_thread(self._sync_create_coin_flip_request, draw_id, user1_id, user2_id, hours_to_agree)
+
+    def _sync_respond_to_coin_flip(self, request_id: int, user_id: int, agreed: bool) -> Dict:
         """User responds to coin flip request."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1554,7 +1773,11 @@ class Database:
             "message": "Waiting for other user",
         }
 
-    def get_coin_flip_status(self, user_id: int) -> Optional[Dict]:
+    async def respond_to_coin_flip(self, request_id: int, user_id: int, agreed: bool) -> Dict:
+        """User responds to coin flip request."""
+        return await asyncio.to_thread(self._sync_respond_to_coin_flip, request_id, user_id, agreed)
+
+    def _sync_get_coin_flip_status(self, user_id: int) -> Optional[Dict]:
         """Get pending coin flip request for a user."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1570,6 +1793,10 @@ class Database:
 
         row = cursor.fetchone()
         return dict(row) if row else None
+
+    async def get_coin_flip_status(self, user_id: int) -> Optional[Dict]:
+        """Get pending coin flip request for a user."""
+        return await asyncio.to_thread(self._sync_get_coin_flip_status, user_id)
 
 
 # Singleton instance
