@@ -101,15 +101,21 @@ class ConnectionManager:
         """Subscribe a websocket to a topic."""
         if topic in self.topics:
             self.topics[topic].add(websocket)
-            await self._send_json(websocket, {"type": "status", "message": f"Subscribed to {topic}"})
+            await self._send_json(
+                websocket, {"type": "status", "message": f"Subscribed to {topic}"}
+            )
         else:
-            await self._send_json(websocket, {"type": "error", "message": "Topic not found"})
+            await self._send_json(
+                websocket, {"type": "error", "message": "Topic not found"}
+            )
 
     async def unsubscribe(self, websocket: WebSocket, topic: str):
         """Unsubscribe a websocket from a topic."""
         if topic in self.topics:
             self.topics[topic].discard(websocket)
-            await self._send_json(websocket, {"type": "status", "message": f"Unsubscribed from {topic}"})
+            await self._send_json(
+                websocket, {"type": "status", "message": f"Unsubscribed from {topic}"}
+            )
 
     async def send_personal(self, user_id: int, message: dict):
         """Send a message to a specific user."""
@@ -137,7 +143,9 @@ class ConnectionManager:
             return
 
         disconnected = []
-        connections_to_send = [ws for ws in self.all_connections if ws != exclude]
+        connections_to_send = [
+            ws for ws in self.topics.get(topic, set()) if ws != exclude
+        ]
 
         for i in range(0, len(connections_to_send), batch_size):
             batch = connections_to_send[i : i + batch_size]
