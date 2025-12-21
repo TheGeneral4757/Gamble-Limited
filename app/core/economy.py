@@ -152,37 +152,37 @@ class EconomySystem:
         info["global_rate"] = self.get_current_exchange_rate()
         return info
 
-    def get_balance(self, user_id: int) -> dict:
+    async def get_balance(self, user_id: int) -> dict:
         """Get current balance."""
-        return db.get_balance(user_id)
+        return await db.get_balance(user_id)
 
-    def has_sufficient_funds(
+    async def has_sufficient_funds(
         self, user_id: int, amount: float, currency: str = "credits"
     ) -> bool:
         """Check if user has sufficient funds."""
-        balance = self.get_balance(user_id)
+        balance = await self.get_balance(user_id)
         if currency == "cash":
             return balance["cash"] >= amount
         return balance["credits"] >= amount
 
-    def place_bet(self, user_id: int, amount: float, game: str) -> dict:
+    async def place_bet(self, user_id: int, amount: float, game: str) -> dict:
         """Deduct bet from credits."""
-        balance = self.get_balance(user_id)
+        balance = await self.get_balance(user_id)
 
         if balance["credits"] < amount:
             return {"success": False, "error": "Insufficient credits"}
 
-        new_balance = db.update_balance(user_id, credits_delta=-amount)
-        db.log_transaction(user_id, "bet", -amount, new_balance["credits"], game=game)
+        new_balance = await db.update_balance(user_id, credits_delta=-amount)
+        await db.log_transaction(user_id, "bet", -amount, new_balance["credits"], game=game)
 
         return {"success": True, "balance": new_balance}
 
-    def add_winnings(
+    async def add_winnings(
         self, user_id: int, amount: float, game: str, bet: float = 0
     ) -> dict:
         """Add winnings to credits."""
-        new_balance = db.update_balance(user_id, credits_delta=amount)
-        db.log_transaction(
+        new_balance = await db.update_balance(user_id, credits_delta=amount)
+        await db.log_transaction(
             user_id,
             "win",
             amount,
@@ -190,25 +190,25 @@ class EconomySystem:
             game=game,
             details=f"Bet: {bet}",
         )
-        db.record_game(user_id, game, bet, amount)
+        await db.record_game(user_id, game, bet, amount)
 
         return {"success": True, "balance": new_balance}
 
-    def do_exchange(self, user_id: int, from_currency: str, amount: float) -> dict:
+    async def do_exchange(self, user_id: int, from_currency: str, amount: float) -> dict:
         """Exchange between cash and credits with dynamic rate."""
         rate = self.get_current_exchange_rate()
-        balance = self.get_balance(user_id)
+        balance = await self.get_balance(user_id)
 
         if from_currency == "cash":
             if balance["cash"] < amount:
                 return {"success": False, "error": "Insufficient cash"}
 
             credits_received = amount * rate
-            new_balance = db.update_balance(
+            new_balance = await db.update_balance(
                 user_id, cash_delta=-amount, credits_delta=credits_received
             )
-            db.record_conversion(user_id, amount)
-            db.log_transaction(
+            await db.record_conversion(user_id, amount)
+            await db.log_transaction(
                 user_id,
                 "exchange",
                 amount,
@@ -229,11 +229,11 @@ class EconomySystem:
                 return {"success": False, "error": "Insufficient credits"}
 
             cash_received = amount / rate
-            new_balance = db.update_balance(
+            new_balance = await db.update_balance(
                 user_id, cash_delta=cash_received, credits_delta=-amount
             )
-            db.record_conversion(user_id, amount)
-            db.log_transaction(
+            await db.record_conversion(user_id, amount)
+            await db.log_transaction(
                 user_id,
                 "exchange",
                 amount,
