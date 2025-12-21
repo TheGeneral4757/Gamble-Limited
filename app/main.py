@@ -207,13 +207,16 @@ async def websocket_endpoint(websocket: WebSocket):
             extra={"client_ip": client_ip},
         )
         await websocket.accept()
-        await websocket.send_bytes(json.dumps({"type": "error", "message": "Authentication failed"}))
+        await websocket.send_bytes(
+            json.dumps({"type": "error", "message": "Authentication failed"})
+        )
         await websocket.close()
         return
 
     await ws_manager.connect(websocket, user_id)
     ws_logger.info(
-        "WebSocket connected", extra={"user_id": user_id, "client_ip": client_ip}
+        "WebSocket connected",
+        extra={"user_id": user_id, "client_ip": client_ip},
     )
 
     # Initialize rate limiter for the user
@@ -222,13 +225,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            # Receive message
-            data = await websocket.receive_bytes()
+            # Game Warden: Add a size limit to prevent DoS
+            data = await websocket.receive_bytes(
+                max_size_bytes=16 * 1024
+            )  # 16 KB limit
 
             # --- Game Warden: WebSocket Rate Limiting ---
             current_time = time.time()
-            # FAIL-CLOSED: Use direct access. If user_id is missing, it's a server
-            # error. The exception handler will catch the KeyError and disconnect.
+            # FAIL-CLOSED: Use direct access. If user_id is missing, it's a
+            # server error. The exception handler will catch the KeyError
+            # and disconnect.
             user_timestamps = ws_rate_limiter[user_id]
 
             # Remove old timestamps
@@ -244,7 +250,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     "WebSocket rate limit exceeded",
                     extra={"user_id": user_id, "client_ip": client_ip},
                 )
-                # Silently drop the message by skipping the processing loop
+                # Silently drop the message
                 continue
 
             # Add current message timestamp
@@ -281,7 +287,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect as e:
         ws_manager.disconnect(websocket, user_id)
         if user_id in ws_rate_limiter:
-            del ws_rate_limiter[user_id]  # Clean up rate-limiter memory
+            del ws_rate_limiter[user_id]  # Clean up
         ws_logger.info(
             "WebSocket disconnected",
             extra={
@@ -295,7 +301,7 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.warning(f"WebSocket error: {e}")
         ws_manager.disconnect(websocket, user_id)
         if user_id in ws_rate_limiter:
-            del ws_rate_limiter[user_id]  # Clean up rate-limiter memory
+            del ws_rate_limiter[user_id]  # Clean up
         ws_logger.error(
             "WebSocket error",
             extra={"user_id": user_id, "client_ip": client_ip, "error": str(e)},

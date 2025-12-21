@@ -1,6 +1,7 @@
 """
 Authentication and Authorization Tests for RNG-THING
 """
+
 import sys
 import os
 
@@ -10,11 +11,10 @@ import asyncio
 import json
 import websockets
 from httpx import AsyncClient, ASGITransport
-from starlette.websockets import WebSocketDisconnect
 
 from app.main import app
 from app.core.database import db
-from tests.test_all import test, random_username
+from tests.test_all import test, random_username, TEST_HOST, TEST_PORT
 
 # Use a test-specific database
 DB_PATH = "data/test_casino.db"
@@ -27,7 +27,7 @@ db._init_db()
 async def get_cookies(username, password):
     """Helper to login and get cookies."""
     transport = ASGITransport(app=app)
-    # Loadout: Disable follow_redirects to capture the cookie from the initial 303 response
+    # Loadout: Disable follow_redirects to capture the cookie
     async with AsyncClient(
         transport=transport, base_url="http://test", follow_redirects=False
     ) as client:
@@ -40,12 +40,10 @@ async def get_cookies(username, password):
 
 @test("Successful login sets session cookie")
 async def test_login_sets_signature():
-    """Verify that a successful login returns a `session` cookie."""
+    """Verify `session` cookie is set on successful login."""
     cookies = await get_cookies(random_username(), "password123")
     assert "session" in cookies, "Session cookie not found"
 
-
-from tests.test_all import TEST_HOST, TEST_PORT
 
 async def ws_connect_with_cookies(cookies):
     """Connect to WebSocket with cookies."""
@@ -142,9 +140,42 @@ async def test_websocket_rate_limiter():
         # The number of received messages should be exactly the limit
         # as the server should broadcast back the messages that were not dropped
         from app.main import WS_MAX_MESSAGES
+
         assert (
             received_count == WS_MAX_MESSAGES
         ), f"Expected {WS_MAX_MESSAGES} messages, but received {received_count}"
 
     finally:
         await ws.close()
+
+
+@test("WebSocket rejects oversized messages")
+async def test_websocket_message_size_limit():
+    """Verify the server rejects WebSocket messages larger than the configured limit."""
+    cookies = await get_cookies(random_username(), "password123")
+    ws = await ws_connect_with_cookies(cookies)
+
+    try:
+        # Create a payload larger than the 16KB limit
+        oversized_payload = "A" * (17 * 1024)  # 17 KB
+
+        await ws.send(oversized_payload)
+
+        # The server should disconnect us. If it doesn't, this recv will hang,
+        # and the test will time out, which is a failure. Or it might
+        # throw a different error if the message is processed.
+        await ws.recv()
+
+        # If we reach here, the connection was not closed as expected.
+        assert False, "Server accepted an oversized WebSocket message."
+
+    except websockets.exceptions.ConnectionClosed as e:
+        # The connection SHOULD be closed with code 1009 (Message Too Big)
+        assert (
+            e.code == 1009
+        ), f"Expected close code 1009 (Message Too Big), but got {e.code}"
+
+    finally:
+        # Ensure the connection is closed even if the test fails
+        if not ws.closed:
+            await ws.close()
