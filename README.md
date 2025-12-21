@@ -12,9 +12,18 @@ A full-featured, self-hosted casino gaming platform built with Python and FastAP
 
 ## ⚡ Quickstart: Run Locally
 
-From the root of the repository, run the following commands to set up and start the development server:
+### Prerequisites
+- Python 3.10+
+- `pip` for installing dependencies
+
+### Installation & Setup
+From your terminal, run the following commands to clone the repository, set up the environment, and start the development server:
 
 ```bash
+# Clone the repository and navigate into it
+git clone https://github.com/yourusername/RNG-THING.git
+cd RNG-THING
+
 # Run setup script (creates venv, installs deps, generates .env)
 bash scripts/setup_dev.sh
 
@@ -71,42 +80,23 @@ After the server starts, you can **login** at [http://localhost:8000](http://loc
 
 ---
 
-## 🚀 Getting Started
+## 🛠️ Developer Utilities
 
-### Prerequisites
-- Python 3.10+
-- `pip` for installing dependencies
-- Docker and Docker Compose (for containerized deployment)
+### WebSocket Logging Verification
+The project includes a utility script to help verify that WebSocket connections, disconnections, and messages are being logged correctly. This is useful when working on features related to real-time events or debugging the logging setup.
 
-### Local Installation (for Development)
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/yourusername/RNG-THING.git
-    cd RNG-THING
-    ```
+To run the script, first ensure the main application server is running in a separate terminal:
+```bash
+# In terminal 1:
+python -m app.main
+```
 
-2.  **Run the development setup script:**
-    This script will create a virtual environment, install dependencies, and set up your `.env` file.
-    ```bash
-    bash scripts/setup_dev.sh
-    ```
-
-3.  **Activate the virtual environment:**
-    ```bash
-    source venv/bin/activate
-    ```
-
-4.  **Create a test user (optional):**
-    This script creates a user with the username `testuser` and password `password`.
-    ```bash
-    python scripts/create_test_user.py
-    ```
-
-5.  **Run the development server:**
-    ```bash
-    python -m app.main
-    ```
-    The server will start at `http://localhost:8000`.
+Then, in a second terminal, run the verification script:
+```bash
+# In terminal 2 (with venv activated):
+python scripts/verify_ws_logging.py
+```
+The script will connect to the WebSocket, send a ping, receive a pong, and then disconnect. You should see corresponding log entries in the output of the main application server.
 
 ---
 
@@ -229,7 +219,7 @@ RNG-THING/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/economy/rate` | Gets the current currency exchange rate. |
-| GET | `/api/economy/balance` | Retrieves the user's balance. |
+| GET | `/api/economy/balance` | Retrieves the user's balance.
 | POST | `/api/economy/exchange` | Exchanges currency. |
 | GET | `/api/economy/transactions` | Gets the user's transaction history. |
 | POST | `/api/economy/daily` | Claims the daily bonus. |
