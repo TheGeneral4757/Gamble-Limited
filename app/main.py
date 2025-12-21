@@ -25,7 +25,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.routers import pages, api, admin
 from app.routers.auth import router as auth_router, get_current_user
-from app.core.websocket import ws_manager
+from app.core.websocket import ws_manager, normalize_ws_close_code
 from app.core.scheduler import lottery_scheduler
 
 # Initialize logging first
@@ -152,34 +152,6 @@ logger.info(f"Admin login path: {settings.security.admin_login_path}")
 # ==================== WebSocket Endpoint ====================
 
 
-def normalize_ws_close_code(code: int) -> str:
-    """Returns a human-readable string for a WebSocket close code."""
-    if 1000 <= code <= 1015:
-        # Standard codes
-        return {
-            1000: "NORMAL_CLOSURE",
-            1001: "GOING_AWAY",
-            1002: "PROTOCOL_ERROR",
-            1003: "UNSUPPORTED_DATA",
-            1004: "RESERVED",
-            1005: "NO_STATUS_RCVD",
-            1006: "ABNORMAL_CLOSURE",
-            1007: "INVALID_FRAME_PAYLOAD_DATA",
-            1008: "POLICY_VIOLATION",
-            1009: "MESSAGE_TOO_BIG",
-            1010: "MANDATORY_EXT",
-            1011: "INTERNAL_ERROR",
-            1012: "SERVICE_RESTART",
-            1013: "TRY_AGAIN_LATER",
-            1014: "BAD_GATEWAY",
-            1015: "TLS_HANDSHAKE",
-        }.get(code, f"UNKNOWN_CODE_{code}")
-    elif 3000 <= code <= 3999:
-        return "IANA_RESERVED"
-    elif 4000 <= code <= 4999:
-        return "PRIVATE_USE"
-    else:
-        return f"INVALID_CODE_{code}"
 
 
 @app.websocket("/ws")
