@@ -499,7 +499,10 @@ async def run_all_tests():
         await test_login_sets_signature()
         await test_websocket_valid_signature()
         await test_websocket_invalid_signature()
-        from tests.test_auth import test_websocket_rate_limiter
+        from tests.test_auth import (
+            test_websocket_rate_limiter,
+            test_websocket_message_size_limit,
+        )
 
         await test_websocket_missing_signature()
         await test_websocket_tampered_cookie()
@@ -507,6 +510,7 @@ async def run_all_tests():
         print("\n🛡️ Game Warden Anti-Cheat Tests")
         print("-" * 40)
         await test_websocket_rate_limiter()
+        await test_websocket_message_size_limit()
 
     except Exception as e:
         print(f"\n❌ Test suite crashed: {e}")
