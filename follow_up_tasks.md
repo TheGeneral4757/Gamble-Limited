@@ -55,3 +55,26 @@ This document outlines the follow-up tasks based on the findings from the Daily 
 - **Description:** The `bandit` scan has identified 78 low-severity issues, including `assert_used`, `hardcoded_password_string`, and `try_except_pass`.
 - **Action:** Refactor the code to address these issues and improve code quality.
 - **Owner:** Backend Team
+
+# Follow-up Tasks for 2025-12-19
+
+This document outlines the follow-up tasks based on the findings from the Daily Director Report of 2025-12-19.
+
+## Critical Tasks (Urgency: Now)
+
+### 1. Fix Failing Authentication and WebSocket Tests (TICKET-12)
+- **Description:** The test suite is failing on two critical tests: "Successful login sets signature cookie" and "Batched broadcast sends to all". These are regressions that block development.
+- **Action:** Investigate and fix the root causes for both test failures.
+- **Owner:** Backend Team
+
+### 2. Upgrade `starlette` Dependency (TICKET-13)
+- **Description:** The `pip-audit` scan has identified two vulnerabilities in the `starlette` dependency (CVE-2025-54121 and CVE-2025-62727).
+- **Action:** Upgrade the `starlette` package to a patched version and run the full test suite to ensure no compatibility issues.
+- **Owner:** Backend Team
+
+## Low Priority Tasks (Urgency: Next Sprint)
+
+### 3. Address Low-Severity Bandit Issues (TICKET-14)
+- **Description:** The `bandit` scan has identified multiple low-severity issues.
+- **Action:** Refactor the code to address these issues and improve code quality.
+- **Owner:** Refactor Agent
