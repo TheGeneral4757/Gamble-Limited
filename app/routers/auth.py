@@ -102,7 +102,7 @@ async def user_login(
         session_cookie.decode("utf-8"),
         max_age=int(timedelta(days=30).total_seconds()),
         httponly=True,
-        samesite="Lax",
+        samesite="Strict",
         secure=not settings.server.debug,  # Use Secure cookies in production
     )
     return response
@@ -214,7 +214,7 @@ async def user_register(
         session_cookie.decode("utf-8"),
         max_age=int(timedelta(days=30).total_seconds()),
         httponly=True,
-        samesite="Lax",
+        samesite="Strict",
         secure=not settings.server.debug,
     )
 
