@@ -1,6 +1,7 @@
 import json
 import hmac
 import hashlib
+import asyncio
 from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -345,7 +346,7 @@ async def logout(request: Request):
     return response
 
 
-def get_current_user(request: Request) -> dict:
+async def get_current_user(request: Request) -> dict:
     """Get current user from a secure, signed cookie."""
     session_cookie = request.cookies.get("session")
     if not session_cookie:
@@ -354,8 +355,10 @@ def get_current_user(request: Request) -> dict:
     try:
         # Verify the cookie signature and timestamp (max_age = 30 days)
         max_age_seconds = int(timedelta(days=30).total_seconds())
-        data = signer.unsign(
-            session_cookie.encode("utf-8"), max_age=max_age_seconds
+
+        # Loadout: Move CPU-bound crypto to a thread to avoid blocking event loop
+        data = await asyncio.to_thread(
+            signer.unsign, session_cookie.encode("utf-8"), max_age_seconds
         )
         session_data = json.loads(data.decode("utf-8"))
 
@@ -369,25 +372,25 @@ def get_current_user(request: Request) -> dict:
         return None
 
 
-def require_login(request: Request):
+async def require_login(request: Request):
     """Check if user is logged in, redirect if not."""
-    user = get_current_user(request)
+    user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/auth", status_code=303)
     return user
 
 
-def require_admin(request: Request):
+async def require_admin(request: Request):
     """Check if user is admin or house."""
-    user = get_current_user(request)
+    user = await get_current_user(request)
 
     if not user or not user["is_admin"]:
         return None
     return user
 
 
-async def admin_user(user: dict = Depends(get_current_user)):
+async def admin_user(user: dict = Depends(require_admin)):
     """Dependency to require admin user."""
-    if not user or not user.get("is_admin"):
+    if not user:
         raise HTTPException(status_code=403, detail="Not authorized")
     return user

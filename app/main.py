@@ -192,7 +192,7 @@ async def websocket_endpoint(websocket: WebSocket):
     - Global chat
     """
     # Get user info from secure cookie
-    user = get_current_user(websocket)
+    user = await get_current_user(websocket)
     user_id = user["user_id"] if user else None
     username = user["username"] if user else "Guest"
     client_ip = websocket.client.host
