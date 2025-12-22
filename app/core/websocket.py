@@ -132,12 +132,14 @@ class ConnectionManager:
         Broadcast a message to all connected clients in a topic in batches
         to avoid event loop blockage.
         """
-        if topic not in self.topics:
-            logger.warning(f"Broadcast to unknown topic: {topic}")
+        # Bolt: Directly iterate over the set of subscribers for the topic.
+        # This is much more efficient than iterating over all connections.
+        subscribers = self.topics.get(topic, set())
+        if not subscribers:
             return
 
         disconnected = []
-        connections_to_send = [ws for ws in self.all_connections if ws != exclude]
+        connections_to_send = [ws for ws in subscribers if ws != exclude]
 
         for i in range(0, len(connections_to_send), batch_size):
             batch = connections_to_send[i : i + batch_size]
