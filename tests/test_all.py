@@ -443,6 +443,44 @@ async def run_websocket_tests():
     await test_batched_broadcast()
 
 
+from httpx import AsyncClient, ASGITransport
+import uuid
+
+
+@test("Idempotency key prevents duplicate requests")
+async def test_idempotency():
+    """Verify that using the same idempotency key twice results in a 409 Conflict."""
+    from tests.test_auth import get_cookies
+
+    username = random_username()
+    cookies = await get_cookies(username, "password123")
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Test the /economy/daily endpoint
+        idempotency_key_daily = str(uuid.uuid4())
+        headers = {"Idempotency-Key": idempotency_key_daily}
+
+        # First request should succeed
+        response1 = await client.post("/api/economy/daily", cookies=cookies, headers=headers)
+        assert response1.status_code == 200, f"First daily bonus claim failed: {response1.text}"
+
+        # Second request with the same key should be rejected
+        response2 = await client.post("/api/economy/daily", cookies=cookies, headers=headers)
+        assert response2.status_code == 409, "Second daily bonus claim should be a conflict"
+
+        # Test the /economy/daily-cash endpoint
+        idempotency_key_cash = str(uuid.uuid4())
+        headers_cash = {"Idempotency-Key": idempotency_key_cash}
+
+        # First request should succeed
+        response_cash1 = await client.post("/api/economy/daily-cash", cookies=cookies, headers=headers_cash)
+        assert response_cash1.status_code == 200, f"First daily cash claim failed: {response_cash1.text}"
+
+        # Second request with the same key should be rejected
+        response_cash2 = await client.post("/api/economy/daily-cash", cookies=cookies, headers=headers_cash)
+        assert response_cash2.status_code == 409, "Second daily cash claim should be a conflict"
+
 import uvicorn
 import threading
 import time
@@ -507,6 +545,7 @@ async def run_all_tests():
         print("\n🛡️ Game Warden Anti-Cheat Tests")
         print("-" * 40)
         await test_websocket_rate_limiter()
+        await test_idempotency()
 
     except Exception as e:
         print(f"\n❌ Test suite crashed: {e}")

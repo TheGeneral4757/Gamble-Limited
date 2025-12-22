@@ -15,6 +15,7 @@ from app.core.games.number_guess import number_guess_game
 from app.core.games.lottery import lottery_system
 from app.config import settings
 from app.core.logger import get_logger
+from app.core.idempotency import idempotent_request
 
 # Rate limiting setup
 try:
@@ -208,6 +209,7 @@ async def get_transactions(request: Request):
 
 
 @router.post("/economy/daily")
+@idempotent_request
 async def claim_daily_bonus(request: Request):
     """Claim daily bonus credits."""
     user_id, is_admin, user_type = get_user_id(request)
@@ -229,6 +231,7 @@ async def claim_daily_bonus(request: Request):
 
 
 @router.post("/economy/daily-cash")
+@idempotent_request
 async def claim_daily_cash(request: Request):
     """Claim daily cash bonus (separate from credits)."""
     user_id, is_admin, user_type = get_user_id(request)

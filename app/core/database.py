@@ -212,6 +212,23 @@ class Database:
                 (default_hash,),
             )
 
+        # Idempotency keys for preventing replay attacks
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS idempotency_keys (
+                key TEXT PRIMARY KEY,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        # Index for faster cleanup
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at
+            ON idempotency_keys (created_at)
+            """
+        )
+
         conn.commit()
 
         # Run migrations for schema upgrades
@@ -1008,6 +1025,35 @@ class Database:
         )
 
         return [dict(row) for row in cursor.fetchall()]
+
+    # ==================== Idempotency ====================
+
+    def is_key_used(self, key: str) -> bool:
+        """Check if an idempotency key has been used."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM idempotency_keys WHERE key = ?", (key,))
+        return cursor.fetchone() is not None
+
+    def mark_key_as_used(self, key: str):
+        """Mark an idempotency key as used."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("INSERT INTO idempotency_keys (key) VALUES (?)", (key,))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            # Key already exists, which is fine in a race condition.
+            pass
+
+    def cleanup_idempotency_keys(self, max_age_hours: int = 24):
+        """Remove old idempotency keys."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cutoff = (datetime.now() - timedelta(hours=max_age_hours)).isoformat()
+        cursor.execute("DELETE FROM idempotency_keys WHERE created_at < ?", (cutoff,))
+        conn.commit()
+        logger.info(f"Cleaned up idempotency keys older than {max_age_hours} hours.")
 
     def get_user_game_stats(self, user_id: int) -> List[Dict]:
         """Get game stats for a specific user."""

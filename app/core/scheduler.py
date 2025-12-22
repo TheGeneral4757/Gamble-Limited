@@ -40,6 +40,15 @@ class LotteryScheduler:
             replace_existing=True,
         )
 
+        # 4. Idempotency Key Cleanup (daily)
+        self.scheduler.add_job(
+            self.cleanup_keys,
+            IntervalTrigger(hours=24),
+            id="cleanup_idempotency_keys",
+            name="Daily Idempotency Key Cleanup",
+            replace_existing=True,
+        )
+
         self.scheduler.start()
         logger.info("Lottery scheduler started")
 
@@ -135,6 +144,14 @@ class LotteryScheduler:
             market.reset_to_baseline()
         except Exception as e:
             logger.error(f"Error resetting market: {e}")
+
+    def cleanup_keys(self):
+        """Clean up old idempotency keys."""
+        try:
+            logger.info("Scheduler: Cleaning up old idempotency keys")
+            db.cleanup_idempotency_keys()
+        except Exception as e:
+            logger.error(f"Error cleaning up idempotency keys: {e}")
 
 
 # Global instance
