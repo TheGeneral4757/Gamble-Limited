@@ -139,6 +139,11 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
+@app.on_event("startup")
+def startup_event():
+    lottery_scheduler.start()
+
+
 @app.on_event("shutdown")
 def shutdown_event():
     lottery_scheduler.shutdown()
