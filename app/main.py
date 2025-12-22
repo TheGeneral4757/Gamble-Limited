@@ -18,6 +18,7 @@ import uvicorn
 import orjson as json
 import time
 from collections import deque
+import secrets
 
 from app.core.logger import init_logging, get_logger
 from app.config import settings, PROJECT_ROOT
@@ -184,6 +185,7 @@ def normalize_ws_close_code(code: int) -> str:
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    connection_id = secrets.token_hex(8)
     """
     WebSocket endpoint for real-time updates.
     Supports:
@@ -204,7 +206,7 @@ async def websocket_endpoint(websocket: WebSocket):
         # Deny connection if user is not authenticated
         ws_logger.warning(
             "WebSocket connection denied due to invalid auth",
-            extra={"client_ip": client_ip},
+            extra={"client_ip": client_ip, "connection_id": connection_id},
         )
         await websocket.accept()
         await websocket.send_bytes(json.dumps({"type": "error", "message": "Authentication failed"}))
@@ -213,7 +215,12 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await ws_manager.connect(websocket, user_id)
     ws_logger.info(
-        "WebSocket connected", extra={"user_id": user_id, "client_ip": client_ip}
+        "WebSocket connected",
+        extra={
+            "user_id": user_id,
+            "client_ip": client_ip,
+            "connection_id": connection_id,
+        },
     )
 
     # Initialize rate limiter for the user
@@ -242,7 +249,11 @@ async def websocket_endpoint(websocket: WebSocket):
             if len(user_timestamps) >= WS_MAX_MESSAGES:
                 ws_logger.warning(
                     "WebSocket rate limit exceeded",
-                    extra={"user_id": user_id, "client_ip": client_ip},
+                    extra={
+                        "user_id": user_id,
+                        "client_ip": client_ip,
+                        "connection_id": connection_id,
+                    },
                 )
                 # Silently drop the message by skipping the processing loop
                 continue
@@ -289,6 +300,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 "client_ip": client_ip,
                 "ws_disconnect_code": e.code,
                 "ws_disconnect_reason": normalize_ws_close_code(e.code),
+                "connection_id": connection_id,
             },
         )
     except Exception as e:
@@ -298,7 +310,12 @@ async def websocket_endpoint(websocket: WebSocket):
             del ws_rate_limiter[user_id]  # Clean up rate-limiter memory
         ws_logger.error(
             "WebSocket error",
-            extra={"user_id": user_id, "client_ip": client_ip, "error": str(e)},
+            extra={
+                "user_id": user_id,
+                "client_ip": client_ip,
+                "error": str(e),
+                "connection_id": connection_id,
+            },
         )
 
 
